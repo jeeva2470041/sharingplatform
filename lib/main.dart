@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'firebase_options.dart';
 import 'data/mock_data.dart';
 import 'login_screen.dart';
+import 'dashboard_screen.dart';
+import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Optional: keep mock items for now
   await MockData.loadItems();
-  // await Firebase.initializeApp();
+
   runApp(const MyApp());
 }
 
@@ -15,33 +28,34 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Campus Sharing',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.grey[50],
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-          ),
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-          ),
-        ),
-        cardTheme: CardThemeData(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
-          ),
-          elevation: 3,
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        ),
       ),
-      home: const LoginScreen(),
+
+      // 🔥 AUTO LOGIN LOGIC using Firebase Auth
+      home: StreamBuilder<User?>(
+        stream: AuthService().authStateChanges,
+        builder: (context, snapshot) {
+          // Since authStateChanges now yields immediately, we can check hasData
+          if (snapshot.hasData) {
+            return const DashboardScreen();
+          }
+          
+          // No user logged in or still loading - show login
+          // connectionState.waiting will be very brief now
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          return const LoginScreen();
+        },
+      ),
     );
   }
 }

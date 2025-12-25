@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "66815410352",
+    "project_id": "campus-share-6accf",
+    "storage_bucket": "campus-share-6accf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:66815410352:android:9d6da9e01d9a5d9052fb75",
+        "android_client_info": {
+          "package_name": "com.example.sharingplatform.sharingplatform"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDG6HywB1d98nyN5HbO3pqVVC36_vh8LJI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -12,8 +12,55 @@ class PostItemScreen extends StatefulWidget {
 class _PostItemScreenState extends State<PostItemScreen> {
   final _nameController = TextEditingController();
   final _depositController = TextEditingController();
-  String _selectedCategory = 'Calculator';
-  final List<String> _categories = ['Calculator', 'Notes', 'Book'];
+  String _selectedCategory = MockData.categories.first;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!MockData.categories.contains(_selectedCategory)) {
+      _selectedCategory = MockData.categories.first;
+    }
+  }
+
+  Future<void> _addCategory() async {
+    final controller = TextEditingController();
+    final newCategory = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Category'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Category Name',
+            hintText: 'e.g., Lab Coat',
+          ),
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                Navigator.pop(context, controller.text.trim());
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (newCategory != null && !MockData.categories.contains(newCategory)) {
+      setState(() {
+        MockData.categories.add(newCategory);
+        _selectedCategory = newCategory;
+      });
+      await MockData.saveCategories();
+    }
+  }
 
   Future<void> _submit() async {
     if (_nameController.text.isEmpty) {
@@ -29,7 +76,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
       name: _nameController.text,
       category: _selectedCategory,
       deposit: _depositController.text.isEmpty ? '0' : _depositController.text,
-      ownerId: 'currentUser',
+      ownerId: MockData.currentUserId,
       status: ItemStatus.available,
     );
 
@@ -85,26 +132,37 @@ class _PostItemScreenState extends State<PostItemScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedCategory,
-                        items: _categories.map((category) {
-                          return DropdownMenuItem(
-                            value: category,
-                            child: Text(category),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedCategory = value!;
-                          });
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Category',
-                          prefixIcon: Icon(Icons.category_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          ),
+                      const Text(
+                        'Category',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.black54,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 4.0,
+                        children: [
+                          ...MockData.categories.map((category) {
+                            return ChoiceChip(
+                              label: Text(category),
+                              selected: _selectedCategory == category,
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _selectedCategory = category;
+                                  });
+                                }
+                              },
+                            );
+                          }),
+                          ActionChip(
+                            avatar: const Icon(Icons.add, size: 16),
+                            label: const Text('Add Category'),
+                            onPressed: _addCategory,
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       TextField(

@@ -3,6 +3,7 @@ import 'data/mock_data.dart';
 import 'models/item.dart';
 import 'widgets/status_badge.dart';
 import 'widgets/rating_dialog.dart';
+import 'chat_screen.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
@@ -197,7 +198,7 @@ class _ItemCardState extends State<ItemCard> {
   Future<void> _processRequest() async {
     setState(() {
       widget.item.status = ItemStatus.requested;
-      widget.item.requestedBy = 'currentUser';
+      widget.item.requestedBy = MockData.currentUserId;
     });
 
     // Lock deposit in wallet
@@ -288,12 +289,27 @@ class _ItemCardState extends State<ItemCard> {
     );
   }
 
+  void _openChat() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          itemId: widget.item.id,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool canRequest = widget.item.status == ItemStatus.available;
     final bool canReturn =
         widget.item.status == ItemStatus.approved &&
-        widget.item.requestedBy == 'currentUser';
+        widget.item.requestedBy == MockData.currentUserId;
+    final bool canChat =
+        widget.item.requestedBy == MockData.currentUserId &&
+        (widget.item.status == ItemStatus.requested ||
+            widget.item.status == ItemStatus.approved);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -359,7 +375,21 @@ class _ItemCardState extends State<ItemCard> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                StatusBadge(status: widget.item.status),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (canChat)
+                      IconButton(
+                        icon: const Icon(Icons.chat_bubble_outline),
+                        color: Colors.blue,
+                        onPressed: _openChat,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    const SizedBox(width: 8),
+                    StatusBadge(status: widget.item.status),
+                  ],
+                ),
                 if (canRequest || canReturn) ...[
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
@@ -377,6 +407,26 @@ class _ItemCardState extends State<ItemCard> {
                       size: 18,
                     ),
                     label: Text(canRequest ? 'Request' : 'Return'),
+                  ),
+                ] else if (widget.item.status == ItemStatus.requested ||
+                    widget.item.status == ItemStatus.approved) ...[
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: null,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(100, 36),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      disabledBackgroundColor: Colors.grey.shade200,
+                      disabledForegroundColor: Colors.grey.shade500,
+                    ),
+                    icon: const Icon(Icons.lock_clock, size: 18),
+                    label: Text(
+                      widget.item.status == ItemStatus.requested
+                          ? 'Requested'
+                          : 'Approved',
+                    ),
                   ),
                 ],
               ],

@@ -4,59 +4,84 @@ import '../models/item.dart';
 import '../models/user_wallet.dart';
 
 class MockData {
+  static const String lenderId = 'lender_user';
+  static const String borrowerId = 'borrower_user';
+  static String currentUserId = borrowerId; // Start as borrower
+
   static final UserWallet userWallet = UserWallet(
     balance: 1000.0,
     lockedDeposit: 0.0,
   );
 
-  static List<Item> allItems = [
-    Item(
-      id: '1',
-      name: 'Engineering Mechanics Book',
-      category: 'Book',
-      deposit: '10',
-      ownerId: 'user123',
-      status: ItemStatus.available,
-    ),
-    Item(
-      id: '2',
-      name: 'Casio fx-991EX',
-      category: 'Calculator',
-      deposit: '20',
-      ownerId: 'user456',
-      status: ItemStatus.requested,
-      requestedBy: 'currentUser',
-    ),
-    Item(
-      id: '3',
-      name: 'Chemistry Notes',
-      category: 'Notes',
-      deposit: '0',
-      ownerId: 'user789',
-      status: ItemStatus.available,
-    ),
-    Item(
-      id: '4',
-      name: 'Physics Textbook',
-      category: 'Book',
-      deposit: '15',
-      ownerId: 'currentUser',
-      status: ItemStatus.approved,
-      requestedBy: 'user111',
-    ),
-    Item(
-      id: '5',
-      name: 'Geometry Set',
-      category: 'Calculator',
-      deposit: '5',
-      ownerId: 'currentUser',
-      status: ItemStatus.available,
-    ),
-  ];
+  static List<Item> allItems = _getDefaultItems();
+  static List<String> categories = ['Electronics', 'Book', 'Calculator', 'Notes'];
+
+  static List<Item> _getDefaultItems() {
+    return [
+      Item(
+        id: '1',
+        name: 'Mechanical Keyboard',
+        category: 'Electronics',
+        deposit: '25',
+        ownerId: lenderId, // Owned by the lender
+        status: ItemStatus.requested,
+        requestedBy: borrowerId, // Requested by the borrower
+      ),
+      Item(
+        id: '2',
+        name: 'Data Structures Textbook',
+        category: 'Book',
+        deposit: '10',
+        ownerId: lenderId, // Owned by the lender
+        status: ItemStatus.available,
+      ),
+      Item(
+        id: '3',
+        name: 'Scientific Calculator',
+        category: 'Calculator',
+        deposit: '15',
+        ownerId: 'another_user',
+        status: ItemStatus.available,
+      ),
+      Item(
+        id: '4',
+        name: 'Old Class Notes',
+        category: 'Notes',
+        deposit: '0',
+        ownerId: borrowerId, // Owned by the borrower
+        status: ItemStatus.available,
+      ),
+    ];
+  }
+
+  static Future<void> resetData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('items');
+    await prefs.remove('wallet');
+    await prefs.remove('categories');
+    
+    allItems = _getDefaultItems();
+    categories = ['Electronics', 'Book', 'Calculator', 'Notes'];
+    currentUserId = borrowerId; // Reset to borrower
+    userWallet.balance = 1000.0;
+    userWallet.lockedDeposit = 0.0;
+    
+    await saveItems();
+    await saveWallet();
+    await saveCategories();
+  }
 
   static Future<void> loadItems() async {
     final prefs = await SharedPreferences.getInstance();
     
+    // Load Categories
+    final String? categoriesJson = prefs.getString('categories');
+    if (categoriesJson != null) {
+      categories = List<String>.from(jsonDecode(categoriesJson));
+    } else {
+      await saveCategories();
+    }
+
     // Load Items
     final String? itemsJson = prefs.getString('items');
     if (itemsJson != null) {
@@ -90,12 +115,18 @@ class MockData {
     await prefs.setString('wallet', walletJson);
   }
 
+  static Future<void> saveCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String categoriesJson = jsonEncode(categories);
+    await prefs.setString('categories', categoriesJson);
+  }
+
   static List<Item> get myPostedItems =>
-      allItems.where((item) => item.ownerId == 'currentUser').toList();
+      allItems.where((item) => item.ownerId == currentUserId).toList();
 
   static List<Item> get myRequestedItems =>
-      allItems.where((item) => item.requestedBy == 'currentUser').toList();
+      allItems.where((item) => item.requestedBy == currentUserId).toList();
 
   static List<Item> get marketplaceItems =>
-      allItems.where((item) => item.ownerId != 'currentUser').toList();
+      allItems.where((item) => item.ownerId != currentUserId).toList();
 }
