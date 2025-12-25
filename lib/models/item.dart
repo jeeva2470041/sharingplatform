@@ -1,13 +1,13 @@
-enum ItemStatus { available, requested, approved, returned }
+enum ItemStatus { available, requested, approved, returned, settled }
 
 class Item {
   final String id;
   final String name;
   final String category;
   final String deposit;
-  final String ownerId;
+  final String ownerId; // User who posted the item (LENDER)
   ItemStatus status;
-  String? requestedBy;
+  String? borrowerId; // User who borrowed/requested the item (BORROWER)
   double? rating;
   int? ratingCount;
 
@@ -18,7 +18,7 @@ class Item {
     required this.deposit,
     required this.ownerId,
     this.status = ItemStatus.available,
-    this.requestedBy,
+    this.borrowerId,
     this.rating,
     this.ratingCount,
   });
@@ -33,6 +33,8 @@ class Item {
         return 'Approved';
       case ItemStatus.returned:
         return 'Returned';
+      case ItemStatus.settled:
+        return 'Settled';
     }
   }
 
@@ -44,7 +46,7 @@ class Item {
       'deposit': deposit,
       'ownerId': ownerId,
       'status': status.index,
-      'requestedBy': requestedBy,
+      'borrowerId': borrowerId,
       'rating': rating,
       'ratingCount': ratingCount,
     };
@@ -58,7 +60,7 @@ class Item {
       deposit: json['deposit'],
       ownerId: json['ownerId'],
       status: ItemStatus.values[json['status']],
-      requestedBy: json['requestedBy'],
+      borrowerId: json['borrowerId'],
       rating: json['rating']?.toDouble(),
       ratingCount: json['ratingCount'],
     );

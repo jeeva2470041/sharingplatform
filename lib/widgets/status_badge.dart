@@ -16,6 +16,8 @@ class StatusBadge extends StatelessWidget {
         return Colors.blue;
       case ItemStatus.returned:
         return Colors.grey;
+      case ItemStatus.settled:
+        return Colors.purple;
     }
   }
 
@@ -29,6 +31,8 @@ class StatusBadge extends StatelessWidget {
         return Colors.blue.shade50;
       case ItemStatus.returned:
         return Colors.grey.shade200;
+      case ItemStatus.settled:
+        return Colors.purple.shade50;
     }
   }
 
@@ -42,6 +46,8 @@ class StatusBadge extends StatelessWidget {
         return 'Approved';
       case ItemStatus.returned:
         return 'Returned';
+      case ItemStatus.settled:
+        return 'Settled';
     }
   }
 

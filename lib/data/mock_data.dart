@@ -1,132 +1,108 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/item.dart';
 import '../models/user_wallet.dart';
 
 class MockData {
-  static const String lenderId = 'lender_user';
-  static const String borrowerId = 'borrower_user';
-  static String currentUserId = borrowerId; // Start as borrower
+  /// Per-user wallets stored by userId
+  static Map<String, UserWallet> _userWallets = {};
 
-  static final UserWallet userWallet = UserWallet(
-    balance: 1000.0,
-    lockedDeposit: 0.0,
-  );
-
-  static List<Item> allItems = _getDefaultItems();
-  static List<String> categories = ['Electronics', 'Book', 'Calculator', 'Notes'];
-
-  static List<Item> _getDefaultItems() {
-    return [
-      Item(
-        id: '1',
-        name: 'Mechanical Keyboard',
-        category: 'Electronics',
-        deposit: '25',
-        ownerId: lenderId, // Owned by the lender
-        status: ItemStatus.requested,
-        requestedBy: borrowerId, // Requested by the borrower
-      ),
-      Item(
-        id: '2',
-        name: 'Data Structures Textbook',
-        category: 'Book',
-        deposit: '10',
-        ownerId: lenderId, // Owned by the lender
-        status: ItemStatus.available,
-      ),
-      Item(
-        id: '3',
-        name: 'Scientific Calculator',
-        category: 'Calculator',
-        deposit: '15',
-        ownerId: 'another_user',
-        status: ItemStatus.available,
-      ),
-      Item(
-        id: '4',
-        name: 'Old Class Notes',
-        category: 'Notes',
-        deposit: '0',
-        ownerId: borrowerId, // Owned by the borrower
-        status: ItemStatus.available,
-      ),
-    ];
+  /// Get current user's wallet (creates default if not exists)
+  static UserWallet get userWallet {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    if (!_userWallets.containsKey(userId)) {
+      _userWallets[userId] = UserWallet(balance: 1000.0, lockedDeposit: 0.0);
+    }
+    return _userWallets[userId]!;
   }
 
-  static Future<void> resetData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('items');
-    await prefs.remove('wallet');
-    await prefs.remove('categories');
-    
-    allItems = _getDefaultItems();
-    categories = ['Electronics', 'Book', 'Calculator', 'Notes'];
-    currentUserId = borrowerId; // Reset to borrower
-    userWallet.balance = 1000.0;
-    userWallet.lockedDeposit = 0.0;
-    
-    await saveItems();
-    await saveWallet();
-    await saveCategories();
+  /// Get wallet for a specific user (for lender settlements)
+  static UserWallet getWalletForUser(String userId) {
+    if (!_userWallets.containsKey(userId)) {
+      _userWallets[userId] = UserWallet(balance: 1000.0, lockedDeposit: 0.0);
+    }
+    return _userWallets[userId]!;
   }
 
+  /// Default item categories
+  static List<String> categories = [
+    'Electronics',
+    'Books',
+    'Calculators',
+    'Notes',
+    'Lab Equipment',
+  ];
+
+  /// All items in the platform (starts empty, users add items)
+  static List<Item> allItems = [];
+
+  /// Initialize data from SharedPreferences on app startup
   static Future<void> loadItems() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Load Categories
-    final String? categoriesJson = prefs.getString('categories');
-    if (categoriesJson != null) {
-      categories = List<String>.from(jsonDecode(categoriesJson));
-    } else {
-      await saveCategories();
-    }
+    final itemsJson = prefs.getStringList('items') ?? [];
+    allItems = itemsJson
+        .map((item) => Item.fromJson(jsonDecode(item)))
+        .toList();
+  }
 
-    // Load Items
-    final String? itemsJson = prefs.getString('items');
-    if (itemsJson != null) {
-      final List<dynamic> decodedList = jsonDecode(itemsJson);
-      allItems = decodedList.map((item) => Item.fromJson(item)).toList();
-    } else {
-      // Save initial mock data if nothing saved yet
-      await saveItems();
-    }
-
-    // Load Wallet
-    final String? walletJson = prefs.getString('wallet');
-    if (walletJson != null) {
-      final Map<String, dynamic> walletMap = jsonDecode(walletJson);
-      userWallet.balance = (walletMap['balance'] as num).toDouble();
-      userWallet.lockedDeposit = (walletMap['lockedDeposit'] as num).toDouble();
-    } else {
-      await saveWallet();
+  /// Load categories from SharedPreferences
+  static Future<void> loadCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedCategories = prefs.getStringList('categories');
+    if (savedCategories != null) {
+      categories = savedCategories;
     }
   }
 
+  /// Load all user wallets from SharedPreferences
+  static Future<void> loadWallet() async {
+    final prefs = await SharedPreferences.getInstance();
+    final walletsJson = prefs.getString('user_wallets');
+    if (walletsJson != null) {
+      final Map<String, dynamic> data = jsonDecode(walletsJson);
+      _userWallets = data.map((key, value) =>
+          MapEntry(key, UserWallet.fromJson(value as Map<String, dynamic>)));
+    }
+  }
+
+  /// Save items to SharedPreferences
   static Future<void> saveItems() async {
     final prefs = await SharedPreferences.getInstance();
-    final String itemsJson = jsonEncode(allItems.map((e) => e.toJson()).toList());
-    await prefs.setString('items', itemsJson);
+    final itemsJson =
+        allItems.map((item) => jsonEncode(item.toJson())).toList();
+    await prefs.setStringList('items', itemsJson);
   }
 
+  /// Save all user wallets to SharedPreferences
   static Future<void> saveWallet() async {
     final prefs = await SharedPreferences.getInstance();
-    final String walletJson = jsonEncode(userWallet.toJson());
-    await prefs.setString('wallet', walletJson);
+    final walletsData = _userWallets.map((key, value) =>
+        MapEntry(key, value.toJson()));
+    await prefs.setString('user_wallets', jsonEncode(walletsData));
   }
 
+  /// Save categories to SharedPreferences
   static Future<void> saveCategories() async {
     final prefs = await SharedPreferences.getInstance();
-    final String categoriesJson = jsonEncode(categories);
-    await prefs.setString('categories', categoriesJson);
+    await prefs.setStringList('categories', categories);
   }
 
-  static List<Item> get myPostedItems =>
-      allItems.where((item) => item.ownerId == currentUserId).toList();
+  /// Get items posted by current user (LENDER role)
+  static List<Item> get myPostedItems {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    return allItems.where((item) => item.ownerId == currentUserId).toList();
+  }
 
-  static List<Item> get myRequestedItems =>
-      allItems.where((item) => item.requestedBy == currentUserId).toList();
+  /// Get items borrowed by current user (BORROWER role)
+  static List<Item> get myBorrowedItems {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    return allItems.where((item) => item.borrowerId == currentUserId).toList();
+  }
 
-  static List<Item> get marketplaceItems =>
-      allItems.where((item) => item.ownerId != currentUserId).toList();
+  /// Get items available in marketplace (excluding own items)
+  static List<Item> get marketplaceItems {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    return allItems.where((item) => item.ownerId != currentUserId).toList();
+  }
 }

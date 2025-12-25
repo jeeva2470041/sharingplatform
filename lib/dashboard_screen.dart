@@ -16,50 +16,48 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  void _switchUser() {
-    setState(() {
-      if (MockData.currentUserId == MockData.borrowerId) {
-        MockData.currentUserId = MockData.lenderId;
-      } else {
-        MockData.currentUserId = MockData.borrowerId;
-      }
-    });
+  /// Get the current authenticated user's display name
+  String _getUserDisplayName() {
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.displayName ?? 
+           user?.email?.split('@').first ?? 
+           'User';
+  }
+
+  /// Get the current authenticated user's ID
+  String _getCurrentUserId() {
+    return FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+  }
+
+  /// Get items posted by current user (LENDER role)
+  List<Item> _getMyPostedItems() {
+    final currentUserId = _getCurrentUserId();
+    return MockData.allItems
+        .where((item) => item.ownerId == currentUserId)
+        .toList();
+  }
+
+  /// Get items borrowed by current user (BORROWER role)
+  List<Item> _getMyBorrowedItems() {
+    final currentUserId = _getCurrentUserId();
+    return MockData.allItems
+        .where((item) => item.borrowerId == currentUserId)
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isBorrower = MockData.currentUserId == MockData.borrowerId;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dashboard (${isBorrower ? "Borrower" : "Lender"})'),
+        title: const Text('Dashboard'),
         elevation: 0,
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Tooltip(
-              message: 'Switch between borrower and lender',
-              child: ElevatedButton.icon(
-                onPressed: _switchUser,
-                icon: const Icon(Icons.switch_account, size: 18),
-                label: const Text('Switch User'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orangeAccent,
-                  foregroundColor: Colors.black87,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign Out',
             onPressed: () async {
               await AuthService().logout();
-              // No manual navigation needed - StreamBuilder in main.dart handles redirect
+              // StreamBuilder in main.dart handles redirect to login
             },
           ),
         ],
@@ -70,7 +68,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Welcome, ${FirebaseAuth.instance.currentUser?.displayName ?? FirebaseAuth.instance.currentUser?.email?.split('@').first ?? (isBorrower ? "Borrower" : "Lender")}!',
+              'Welcome, ${_getUserDisplayName()}!',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
@@ -204,7 +202,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            if (MockData.myPostedItems.isEmpty)
+            if (_getMyPostedItems().isEmpty)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(24.0),
@@ -215,7 +213,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               )
             else
-              ...MockData.myPostedItems.map(
+              ..._getMyPostedItems().map(
                 (item) => _ActivityItemCard(
                   item: item,
                   isOwner: true,
@@ -224,25 +222,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             const SizedBox(height: 24),
             const Text(
-              'Items I Requested',
+              'Items I Borrowed',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            if (MockData.myRequestedItems.isEmpty)
+            if (_getMyBorrowedItems().isEmpty)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(24.0),
                   child: Text(
-                    'No requested items yet',
+                    'No borrowed items yet',
                     style: TextStyle(color: Colors.grey, fontSize: 16),
                   ),
                 ),
               )
             else
-              ...MockData.myRequestedItems.map(
+              ..._getMyBorrowedItems().map(
                 (item) => _ActivityItemCard(
                   item: item,
-                  isRequested: true,
+                  isBorrowed: true,
                   onUpdate: () => setState(() {}),
                 ),
               ),
@@ -299,13 +297,13 @@ class _ActionCard extends StatelessWidget {
 
 class _ActivityItemCard extends StatefulWidget {
   final Item item;
-  final bool isRequested;
+  final bool isBorrowed;
   final bool isOwner;
   final VoidCallback onUpdate;
   const _ActivityItemCard({
     required this.item,
     required this.onUpdate,
-    this.isRequested = false,
+    this.isBorrowed = false,
     this.isOwner = false,
   });
 
@@ -343,16 +341,17 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
   }
 
   Future<void> _rejectRequest() async {
-    // Unlock deposit if any
+    // Unlock deposit and refund to BORROWER's wallet (not current user's)
     final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
-    if (depositAmount > 0) {
-      MockData.userWallet.releaseDeposit(depositAmount);
+    if (depositAmount > 0 && widget.item.borrowerId != null) {
+      final borrowerWallet = MockData.getWalletForUser(widget.item.borrowerId!);
+      borrowerWallet.releaseDeposit(depositAmount);
       await MockData.saveWallet();
     }
 
     setState(() {
       widget.item.status = ItemStatus.available;
-      widget.item.requestedBy = null;
+      widget.item.borrowerId = null; // Clear borrower
     });
     await MockData.saveItems();
     widget.onUpdate();
@@ -362,6 +361,39 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
       const SnackBar(
         content: Text('Request rejected'),
         backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  /// Settlement for damaged/kept items - transfers deposit from borrower to lender
+  Future<void> _settleItem() async {
+    final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    
+    if (depositAmount > 0 && widget.item.borrowerId != null) {
+      // Get borrower's and lender's wallets
+      final borrowerWallet = MockData.getWalletForUser(widget.item.borrowerId!);
+      final lenderWallet = MockData.getWalletForUser(currentUserId); // Owner is the lender
+      
+      // Transfer locked deposit from borrower to lender
+      if (borrowerWallet.transferLockedDeposit(depositAmount)) {
+        lenderWallet.receiveTransferredDeposit(depositAmount);
+      }
+      await MockData.saveWallet();
+    }
+
+    setState(() {
+      widget.item.status = ItemStatus.settled;
+      widget.item.borrowerId = null; // Clear borrower after settlement
+    });
+    await MockData.saveItems();
+    widget.onUpdate();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Item settled. Deposit of \$$depositAmount transferred to your wallet.'),
+        backgroundColor: Colors.orange,
       ),
     );
   }
@@ -379,15 +411,17 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
 
   @override
   Widget build(BuildContext context) {
-    final bool showActions =
+    final bool showRequestActions =
         widget.isOwner && widget.item.status == ItemStatus.requested;
+    final bool showSettlementActions =
+        widget.isOwner && widget.item.status == ItemStatus.approved;
     final bool isApproved = widget.item.status == ItemStatus.approved;
     final bool canChat =
         (widget.item.status == ItemStatus.requested ||
             widget.item.status == ItemStatus.approved);
 
     return Card(
-      color: widget.isRequested
+      color: widget.isBorrowed
           ? Colors.orange.shade50
           : (isApproved ? Colors.green.shade50 : null),
       shape: isApproved
@@ -415,7 +449,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Deposit: \$${widget.item.deposit}'),
-                  if (isApproved && widget.isRequested)
+                  if (isApproved && widget.isBorrowed)
                     const Padding(
                       padding: EdgeInsets.only(top: 4.0),
                       child: Row(
@@ -437,6 +471,30 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
                         ],
                       ),
                     ),
+                  if (isApproved && widget.isOwner)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4.0),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: Colors.blue,
+                          ),
+                          SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Waiting for borrower to return',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
               trailing: Row(
@@ -452,7 +510,8 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
                 ],
               ),
             ),
-            if (showActions) ...[
+            // Actions for lender when request is pending
+            if (showRequestActions) ...[
               const Divider(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -476,6 +535,28 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
                     child: const Text('Approve'),
                   ),
                 ],
+              ),
+            ],
+            // Settlement action for lender when item is approved but damaged/kept
+            if (showSettlementActions) ...[
+              const Divider(),
+              const Text(
+                'If item is damaged or not returned:',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                onPressed: _settleItem,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                ),
+                icon: const Icon(Icons.gavel, size: 18),
+                label: const Text('Settle (Claim Deposit)'),
               ),
             ],
           ],

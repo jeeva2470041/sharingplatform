@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
 import 'widgets/status_badge.dart';
@@ -105,6 +106,19 @@ class _ItemCardState extends State<ItemCard> {
   }
 
   void _requestItem() {
+    // Check if user is trying to borrow their own item
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    
+    if (widget.item.ownerId == currentUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot borrow your own items'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -196,15 +210,32 @@ class _ItemCardState extends State<ItemCard> {
   }
 
   Future<void> _processRequest() async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    
+    // Get borrower's wallet (current user)
+    final borrowerWallet = MockData.getWalletForUser(currentUserId);
+    final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
+    
+    // Check if borrower has enough balance
+    if (depositAmount > 0 && borrowerWallet.balance < depositAmount) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Insufficient balance for deposit'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       widget.item.status = ItemStatus.requested;
-      widget.item.requestedBy = MockData.currentUserId;
+      widget.item.borrowerId = currentUserId; // Set borrower to current user
     });
 
-    // Lock deposit in wallet
-    final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
+    // Lock deposit in borrower's wallet (deduct from balance, add to lockedDeposit)
     if (depositAmount > 0) {
-      MockData.userWallet.lockDeposit(depositAmount);
+      borrowerWallet.lockDeposit(depositAmount);
       await MockData.saveWallet();
     }
 
@@ -266,7 +297,10 @@ class _ItemCardState extends State<ItemCard> {
       context: context,
       builder: (context) => RatingDialog(
         itemName: widget.item.name,
-        onRatingSubmitted: (rating) {
+        onRatingSubmitted: (rating) async {
+          final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+          final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
+          
           setState(() {
             widget.item.status = ItemStatus.returned;
             widget.item.rating =
@@ -276,11 +310,17 @@ class _ItemCardState extends State<ItemCard> {
             widget.item.ratingCount = (widget.item.ratingCount ?? 0) + 1;
           });
 
-          // Release deposit
-          final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
+          // Release deposit back to borrower (current user)
           if (depositAmount > 0) {
-            MockData.userWallet.releaseDeposit(depositAmount);
+            final borrowerWallet = MockData.getWalletForUser(currentUserId);
+            borrowerWallet.releaseDeposit(depositAmount);
+            await MockData.saveWallet();
           }
+          
+          // Reset item for next borrower
+          widget.item.borrowerId = null;
+          widget.item.status = ItemStatus.available;
+          await MockData.saveItems();
 
           // Update parent widget
           widget.onUpdate();
@@ -303,11 +343,12 @@ class _ItemCardState extends State<ItemCard> {
   @override
   Widget build(BuildContext context) {
     final bool canRequest = widget.item.status == ItemStatus.available;
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
     final bool canReturn =
         widget.item.status == ItemStatus.approved &&
-        widget.item.requestedBy == MockData.currentUserId;
+        widget.item.borrowerId == currentUserId;
     final bool canChat =
-        widget.item.requestedBy == MockData.currentUserId &&
+        widget.item.borrowerId == currentUserId &&
         (widget.item.status == ItemStatus.requested ||
             widget.item.status == ItemStatus.approved);
 

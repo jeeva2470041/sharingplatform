@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
 
@@ -70,13 +71,15 @@ class _PostItemScreenState extends State<PostItemScreen> {
       return;
     }
 
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+
     // Add new item to shared list
     final newItem = Item(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: _nameController.text,
       category: _selectedCategory,
       deposit: _depositController.text.isEmpty ? '0' : _depositController.text,
-      ownerId: MockData.currentUserId,
+      ownerId: currentUserId,
       status: ItemStatus.available,
     );
 

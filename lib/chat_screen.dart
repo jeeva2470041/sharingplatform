@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'data/mock_data.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'services/socket_service.dart';
 import 'models/message.dart';
 
@@ -68,7 +68,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    _socketService.sendMessage(widget.itemId, MockData.currentUserId, text);
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    _socketService.sendMessage(widget.itemId, currentUserId, text);
     _messageController.clear();
   }
 
@@ -95,7 +96,8 @@ class _ChatScreenState extends State<ChatScreen> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                final isMe = message.senderId == MockData.currentUserId;
+                final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+                final isMe = message.senderId == currentUserId;
                 return Align(
                   alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
