@@ -290,145 +290,138 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 32),
             // PENDING REQUESTS SECTION - Shows requests lender needs to approve
+                        // Pending Requests Section (unchanged - keep as is)
             StreamBuilder<List<Item>>(
               stream: ItemService.pendingRequestsStream,
               builder: (context, pendingSnapshot) {
                 final pendingItems = pendingSnapshot.data ?? [];
-                if (pendingItems.isEmpty) {
-                  return const SizedBox.shrink();
-                }
+                if (pendingItems.isEmpty) return const SizedBox.shrink();
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(
-                          Icons.notification_important,
-                          color: Colors.orange,
-                          size: 24,
-                        ),
+                        const Icon(Icons.notification_important, color: Colors.orange, size: 24),
                         const SizedBox(width: 8),
-                        const Text(
-                          'Pending Requests',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        const Text('Pending Requests', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${pendingItems.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(12)),
+                          child: Text('${pendingItems.length}',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    ...pendingItems.map(
-                      (item) => _ActivityItemCard(
-                        item: item,
-                        isOwner: true,
-                        onUpdate: () {},
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    ...pendingItems.map((item) => _ActivityItemCard(item: item, isOwner: true, onUpdate: () {})),
+                    const SizedBox(height: 32),
                   ],
                 );
               },
             ),
-            const Text(
-              'Items I Posted',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            StreamBuilder<List<Item>>(
-              stream: ItemService.myPostedItemsStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final items = snapshot.data ?? [];
-                if (items.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Text(
-                        'No items posted yet',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    ),
-                  );
-                }
-                return Column(
-                  children: items
-                      .map(
-                        (item) => _ActivityItemCard(
-                          item: item,
-                          isOwner: true,
-                          onUpdate:
-                              () {}, // No longer needed with StreamBuilder
+
+            // NEW: Expandable Lent Items Section
+            ExpansionTile(
+              leading: const Icon(Icons.upload_outlined, color: Colors.teal),
+              title: const Text(
+                'Lent Items',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text('Items you have posted for lending'),
+              initiallyExpanded: false, // Collapsed by default
+              childrenPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                StreamBuilder<List<Item>>(
+                  stream: ItemService.myPostedItemsStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final items = snapshot.data ?? [];
+                    if (items.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Text(
+                          'No items lent yet',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
                         ),
-                      )
-                      .toList(),
-                );
-              },
+                      );
+                    }
+                    return Column(
+                      children: items.map((item) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _ActivityItemCard(
+                            item: item,
+                            isOwner: true,
+                            onUpdate: () {},
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Items I Borrowed',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            StreamBuilder<List<Item>>(
-              stream: ItemService.myBorrowedItemsStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final items = snapshot.data ?? [];
-                if (items.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Text(
-                        'No borrowed items yet',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    ),
-                  );
-                }
-                return Column(
-                  children: items
-                      .map(
-                        (item) => _ActivityItemCard(
-                          item: item,
-                          isBorrowed: true,
-                          onUpdate:
-                              () {}, // No longer needed with StreamBuilder
+
+            const SizedBox(height: 16),
+
+            // NEW: Expandable Borrowed Items Section
+            ExpansionTile(
+              leading: const Icon(Icons.download_outlined, color: Colors.orange),
+              title: const Text(
+                'Borrowed Items',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text('Items you are currently borrowing'),
+              initiallyExpanded: false, // Collapsed by default
+              childrenPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                StreamBuilder<List<Item>>(
+                  stream: ItemService.myBorrowedItemsStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final items = snapshot.data ?? [];
+                    if (items.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Text(
+                          'No items borrowed yet',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
                         ),
-                      )
-                      .toList(),
-                );
-              },
+                      );
+                    }
+                    return Column(
+                      children: items.map((item) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _ActivityItemCard(
+                            item: item,
+                            isBorrowed: true,
+                            onUpdate: () {},
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+              ],
             ),
+
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
+
+  // Keep _buildFeatureRow, _ActionCard, and _ActivityItemCard unchanged
 
   Widget _buildFeatureRow(String text) {
     return Row(

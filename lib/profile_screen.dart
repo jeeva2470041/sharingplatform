@@ -5,7 +5,6 @@ import 'services/profile_service.dart';
 /// Profile completion screen
 /// Required before lending or borrowing
 class ProfileScreen extends StatefulWidget {
-  /// Action to perform after profile is saved (lend/borrow redirection)
   final String? pendingAction;
 
   const ProfileScreen({super.key, this.pendingAction});
@@ -17,15 +16,33 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
-  final _departmentController = TextEditingController();
   final _contactController = TextEditingController();
   final _emailController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _addressController = TextEditingController(); // Back to free text
+
+  // Only Department uses dropdown
+  String? _selectedDepartment;
 
   bool _isLoading = true;
   bool _isSaving = false;
   UserProfile? _profile;
   String? _error;
+
+  // Your college departments - customize as needed
+  static const List<String> departments = [
+    'Computer Science and Engineering',
+    'Information Technology',
+    'Electronics and Communication Engineering',
+    'Electrical and Electronics Engineering',
+    'Mechanical Engineering',
+    'Civil Engineering',
+    'Chemical Engineering',
+    'Biotechnology',
+    'Artificial Intelligence and Data Science',
+    'Cyber Security',
+    'Aerospace Engineering',
+    'Other',
+  ];
 
   @override
   void initState() {
@@ -36,7 +53,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     _fullNameController.dispose();
-    _departmentController.dispose();
     _contactController.dispose();
     _emailController.dispose();
     _addressController.dispose();
@@ -54,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _profile = profile;
         _fullNameController.text = profile.fullName;
-        _departmentController.text = profile.department;
+        _selectedDepartment = profile.department.isEmpty ? null : profile.department;
         _contactController.text = profile.contactNumber;
         _emailController.text = profile.email;
         _addressController.text = profile.address;
@@ -75,11 +91,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     try {
       await ProfileService.saveProfile(
-        fullName: _fullNameController.text,
-        department: _departmentController.text,
-        contactNumber: _contactController.text,
-        email: _emailController.text,
-        address: _addressController.text,
+        fullName: _fullNameController.text.trim(),
+        department: _selectedDepartment ?? '',
+        contactNumber: _contactController.text.trim(),
+        email: _emailController.text.trim(),
+        address: _addressController.text.trim(),
       );
 
       if (!mounted) return;
@@ -91,7 +107,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
 
-      // Return to previous screen with success
       Navigator.pop(context, true);
     } catch (e) {
       setState(() {
@@ -123,22 +138,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Header
                         _buildHeader(),
                         const SizedBox(height: 24),
-
-                        // Profile form card
                         _buildFormCard(),
-
-                        // Error display
                         if (_error != null) ...[
                           const SizedBox(height: 16),
                           _buildErrorBox(),
                         ],
-
                         const SizedBox(height: 24),
-
-                        // Save button
                         _buildSaveButton(),
                       ],
                     ),
@@ -240,28 +247,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
               labelText: 'Full Name *',
               hintText: 'Enter your full name',
               prefixIcon: const Icon(Icons.person),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            validator: (value) =>
-                value?.trim().isEmpty ?? true ? 'Full name is required' : null,
+            validator: (value) => value?.trim().isEmpty ?? true ? 'Full name is required' : null,
           ),
           const SizedBox(height: 16),
 
-          // Department
-          TextFormField(
-            controller: _departmentController,
+          // Department - Dropdown only
+          DropdownButtonFormField<String>(
+            value: _selectedDepartment,
             decoration: InputDecoration(
               labelText: 'Department *',
-              hintText: 'e.g., Computer Science, Electronics',
+              hintText: 'Select your department',
               prefixIcon: const Icon(Icons.school),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            validator: (value) =>
-                value?.trim().isEmpty ?? true ? 'Department is required' : null,
+            items: departments.map((dept) {
+              return DropdownMenuItem(value: dept, child: Text(dept));
+            }).toList(),
+            onChanged: (value) {
+              setState(() => _selectedDepartment = value);
+            },
+            validator: (value) => value == null ? 'Department is required' : null,
           ),
           const SizedBox(height: 16),
 
@@ -273,17 +280,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               labelText: 'Contact Number *',
               hintText: '10-digit mobile number',
               prefixIcon: const Icon(Icons.phone),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
             validator: (value) {
-              if (value?.trim().isEmpty ?? true) {
-                return 'Contact number is required';
-              }
-              if (value!.trim().length < 10) {
-                return 'Please enter a valid phone number';
-              }
+              if (value?.trim().isEmpty ?? true) return 'Contact number is required';
+              if (value!.trim().length < 10) return 'Please enter a valid phone number';
               return null;
             },
           ),
@@ -297,36 +298,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
               labelText: 'Email ID *',
               hintText: 'your.email@college.edu',
               prefixIcon: const Icon(Icons.email),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
             validator: (value) {
-              if (value?.trim().isEmpty ?? true) {
-                return 'Email is required';
-              }
-              if (!value!.contains('@')) {
-                return 'Please enter a valid email';
-              }
+              if (value?.trim().isEmpty ?? true) return 'Email is required';
+              if (!value!.contains('@')) return 'Please enter a valid email';
               return null;
             },
           ),
           const SizedBox(height: 16),
 
-          // Address
+          // Address - Free text again
           TextFormField(
             controller: _addressController,
             maxLines: 2,
             decoration: InputDecoration(
               labelText: 'Address / Hostel / Block *',
-              hintText: 'e.g., Block A, Room 101',
+              hintText: 'e.g., Nile Hostel Room 305, Off-campus',
               prefixIcon: const Icon(Icons.location_on),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            validator: (value) =>
-                value?.trim().isEmpty ?? true ? 'Address is required' : null,
+            validator: (value) => value?.trim().isEmpty ?? true ? 'Address is required' : null,
           ),
         ],
       ),
