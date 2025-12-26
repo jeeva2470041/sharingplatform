@@ -157,10 +157,15 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
                     // Flash toggle
                     IconButton(
                       onPressed: () async {
-                        await _controller.toggleTorch();
-                        setState(() {
-                          _isFlashOn = !_isFlashOn;
-                        });
+                        try {
+                          await _controller.toggleTorch();
+                          setState(() {
+                            _isFlashOn = !_isFlashOn;
+                          });
+                        } catch (e) {
+                          // Flash not available or controller not ready
+                          debugPrint('Flash toggle error: $e');
+                        }
                       },
                       icon: Icon(
                         _isFlashOn ? Icons.flash_on : Icons.flash_off,
@@ -170,7 +175,13 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
                     ),
                     // Switch camera
                     IconButton(
-                      onPressed: () => _controller.switchCamera(),
+                      onPressed: () {
+                        try {
+                          _controller.switchCamera();
+                        } catch (e) {
+                          debugPrint('Switch camera error: $e');
+                        }
+                      },
                       icon: const Icon(Icons.cameraswitch, color: AppTheme.textSecondary),
                       tooltip: 'Switch Camera',
                     ),
