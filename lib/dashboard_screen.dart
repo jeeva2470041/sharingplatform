@@ -6,6 +6,7 @@ import 'chat_screen.dart';
 import 'qr_handover_screen.dart';
 import 'return_qr_screen.dart';
 import 'profile_screen.dart';
+import 'transactions_screen.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
 import 'widgets/status_badge.dart';
@@ -287,6 +288,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            // Transactions Card
+            SizedBox(
+              width: double.infinity,
+              child: _ActionCard(
+                title: 'Transactions',
+                icon: Icons.history,
+                color: Colors.purple,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TransactionsScreen(),
+                    ),
+                  );
+                  setState(() {}); // Refresh dashboard after returning
+                },
+              ),
             ),
             const SizedBox(height: 32),
             // PENDING REQUESTS SECTION - Shows requests lender needs to approve
