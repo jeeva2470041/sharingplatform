@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../app_theme.dart';
 
@@ -20,15 +22,43 @@ class QrScannerDialog extends StatefulWidget {
 }
 
 class _QrScannerDialogState extends State<QrScannerDialog> {
-  final MobileScannerController _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.normal,
-    facing: CameraFacing.back,
-  );
+  late MobileScannerController _controller;
   bool _hasScanned = false;
   String? _scannedCode;
   bool _isFlashOn = false;
   bool _showManualEntry = false;
+  bool _isControllerInitialized = false;
   final TextEditingController _manualController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _initController();
+  }
+
+  Future<void> _initController() async {
+    _controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+      formats: [BarcodeFormat.qrCode], // Only scan QR codes
+    );
+    
+    try {
+      await _controller.start();
+      if (mounted) {
+        setState(() {
+          _isControllerInitialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error starting camera: $e');
+      if (mounted) {
+        setState(() {
+          _showManualEntry = true;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -41,12 +71,18 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
     if (_hasScanned) return;
     
     final List<Barcode> barcodes = capture.barcodes;
+    debugPrint('Detected ${barcodes.length} barcodes');
+    
     for (final barcode in barcodes) {
+      debugPrint('Barcode: ${barcode.rawValue}, format: ${barcode.format}');
       if (barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
         setState(() {
           _hasScanned = true;
           _scannedCode = barcode.rawValue;
         });
+        
+        // Vibration feedback if available
+        HapticFeedback.mediumImpact();
         
         // Show success feedback briefly then close
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -196,6 +232,34 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
   }
 
   Widget _buildCameraView() {
+    if (!_isControllerInitialized) {
+      return Container(
+        height: 350,
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.border, width: 2),
+          color: Colors.grey.shade100,
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: AppTheme.primary),
+              SizedBox(height: 16),
+              Text(
+                'Starting camera...',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
     return Container(
       height: 350,
       margin: const EdgeInsets.all(16),
@@ -211,6 +275,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
             MobileScanner(
               controller: _controller,
               onDetect: _onDetect,
+              fit: BoxFit.cover,
               errorBuilder: (context, error) {
                 return _buildCameraError(error.errorCode.name);
               },
