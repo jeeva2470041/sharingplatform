@@ -7,6 +7,7 @@ import 'data/mock_data.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
 import 'services/auth_service.dart';
+import 'app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,11 +30,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Campus Sharing',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-        scaffoldBackgroundColor: Colors.grey[50],
-      ),
+      theme: AppTheme.lightTheme,
 
       // 🔥 AUTO LOGIN LOGIC using Firebase Auth
       home: StreamBuilder<User?>(

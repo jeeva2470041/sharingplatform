@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
 import 'services/auth_service.dart';
+import 'app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -50,125 +51,95 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background Image
+          // Background gradient
           Positioned.fill(
-            child: Image.network(
-              'https://search.brave.com/images?q=college+image',
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.teal.shade800, Colors.teal.shade400],
-                    ),
-                  ),
-                  child: const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.teal.shade800, Colors.teal.shade400],
-                    ),
-                  ),
-                );
-              },
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppTheme.primary, AppTheme.primaryPressed],
+                ),
+              ),
             ),
           ),
           // Dark Overlay
           Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.4)),
+            child: Container(color: Colors.black.withOpacity(0.2)),
           ),
           // Login Card
           Center(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
-                horizontal: size.width > 600 ? size.width * 0.25 : 24.0,
-                vertical: 24.0,
+                horizontal: size.width > 600 ? size.width * 0.25 : AppTheme.spacing24,
+                vertical: AppTheme.spacing24,
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppTheme.cardRadius),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.95),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.teal.shade100,
-                        width: 1.5,
-                      ),
+                      color: AppTheme.cardBackground.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                      border: Border.all(color: AppTheme.border, width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.teal.shade900.withOpacity(0.2),
+                          color: AppTheme.primary.withOpacity(0.2),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(32.0),
+                      padding: const EdgeInsets.all(AppTheme.spacing32),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.school,
-                            size: 72,
-                            color: Colors.blue,
-                          ),
-                          const SizedBox(height: 20),
+                          const Icon(Icons.school, size: 72, color: AppTheme.primary),
+                          const SizedBox(height: AppTheme.spacing24),
                           const Text(
                             'Campus Share',
                             style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
                               fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              fontWeight: AppTheme.fontWeightBold,
+                              color: AppTheme.textPrimary,
                               letterSpacing: 1.2,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: AppTheme.spacing8),
                           const Text(
                             'Secure campus-only access',
                             style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.black54,
-                              fontWeight: FontWeight.w500,
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: AppTheme.fontSizeBody,
+                              color: AppTheme.textSecondary,
+                              fontWeight: AppTheme.fontWeightMedium,
                             ),
                           ),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: AppTheme.spacing32),
                           TextField(
                             controller: _emailController,
-                            decoration: InputDecoration(
-                              labelText: 'College Email',
-                              prefixIcon: const Icon(Icons.email_outlined),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: Colors.white.withOpacity(0.7),
+                            decoration: AppTheme.inputDecoration(
+                              label: 'College Email',
+                              prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.textSecondary),
                             ),
                             keyboardType: TextInputType.emailAddress,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppTheme.spacing16),
                           TextField(
                             controller: _passwordController,
                             obscureText: !_isPasswordVisible,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_outline),
+                            decoration: AppTheme.inputDecoration(
+                              label: 'Password',
+                              prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.textSecondary),
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _isPasswordVisible
                                       ? Icons.visibility_outlined
                                       : Icons.visibility_off_outlined,
+                                  color: AppTheme.textSecondary,
                                 ),
                                 onPressed: () {
                                   setState(() {
@@ -176,37 +147,18 @@ class _LoginScreenState extends State<LoginScreen> {
                                   });
                                 },
                               ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: Colors.white.withOpacity(0.7),
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: AppTheme.spacing24),
                           SizedBox(
                             width: double.infinity,
-                            height: 52,
                             child: ElevatedButton(
                               onPressed: _login,
-                              style: ElevatedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                elevation: 4,
-                              ),
-                              child: const Text(
-                                'Login',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              style: AppTheme.primaryButtonStyle,
+                              child: const Text('Login'),
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppTheme.spacing16),
                           TextButton(
                             onPressed: () {
                               Navigator.push(
@@ -216,34 +168,33 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               );
                             },
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.black87,
-                            ),
                             child: const Text(
                               "Don't have an account? Register",
                               style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
+                                fontFamily: AppTheme.fontFamily,
+                                fontWeight: AppTheme.fontWeightSemibold,
+                                fontSize: AppTheme.fontSizeLabel,
+                                color: AppTheme.primary,
                               ),
                             ),
                           ),
                           if (_errorMessage.isNotEmpty)
                             Padding(
-                              padding: const EdgeInsets.only(top: 16.0),
+                              padding: const EdgeInsets.only(top: AppTheme.spacing16),
                               child: Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(AppTheme.spacing12),
                                 decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.red.shade200,
-                                  ),
+                                  color: AppTheme.danger.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                                  border: Border.all(color: AppTheme.danger.withOpacity(0.3)),
                                 ),
                                 child: Text(
                                   _errorMessage,
-                                  style: TextStyle(
-                                    color: Colors.red.shade700,
-                                    fontWeight: FontWeight.w600,
+                                  style: const TextStyle(
+                                    fontFamily: AppTheme.fontFamily,
+                                    color: AppTheme.danger,
+                                    fontWeight: AppTheme.fontWeightSemibold,
+                                    fontSize: AppTheme.fontSizeLabel,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),

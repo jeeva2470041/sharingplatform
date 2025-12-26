@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/item.dart';
+import '../app_theme.dart';
 
 class StatusBadge extends StatelessWidget {
   final ItemStatus status;
@@ -9,34 +10,34 @@ class StatusBadge extends StatelessWidget {
   Color _getColor() {
     switch (status) {
       case ItemStatus.available:
-        return Colors.green;
+        return AppTheme.success;
       case ItemStatus.requested:
-        return Colors.orange;
+        return AppTheme.warning;
       case ItemStatus.approved:
-        return Colors.blue;
+        return AppTheme.primary;
       case ItemStatus.active:
-        return Colors.teal;
+        return AppTheme.primaryPressed;
       case ItemStatus.returned:
-        return Colors.grey;
+        return AppTheme.textSecondary;
       case ItemStatus.settled:
-        return Colors.purple;
+        return AppTheme.primaryHover;
     }
   }
 
   Color _getBackgroundColor() {
     switch (status) {
       case ItemStatus.available:
-        return Colors.green.shade50;
+        return AppTheme.success.withOpacity(0.1);
       case ItemStatus.requested:
-        return Colors.orange.shade50;
+        return AppTheme.warning.withOpacity(0.1);
       case ItemStatus.approved:
-        return Colors.blue.shade50;
+        return AppTheme.primary.withOpacity(0.1);
       case ItemStatus.active:
-        return Colors.teal.shade50;
+        return AppTheme.primaryPressed.withOpacity(0.1);
       case ItemStatus.returned:
-        return Colors.grey.shade200;
+        return AppTheme.textSecondary.withOpacity(0.1);
       case ItemStatus.settled:
-        return Colors.purple.shade50;
+        return AppTheme.primaryHover.withOpacity(0.1);
     }
   }
 
@@ -60,18 +61,19 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing12, vertical: 6),
       decoration: BoxDecoration(
         color: _getBackgroundColor(),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _getColor().withValues(alpha: 0.5)),
+        border: Border.all(color: _getColor().withOpacity(0.5)),
       ),
       child: Text(
         _getText(),
         style: TextStyle(
+          fontFamily: AppTheme.fontFamily,
           color: _getColor(),
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
+          fontWeight: AppTheme.fontWeightSemibold,
+          fontSize: AppTheme.fontSizeHelper,
         ),
       ),
     );

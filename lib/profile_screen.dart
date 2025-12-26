@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'models/user_profile.dart';
 import 'services/profile_service.dart';
+import 'app_theme.dart';
 
 /// Profile completion screen
 /// Required before lending or borrowing
@@ -67,12 +69,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     try {
       final profile = await ProfileService.getCurrentProfile();
+      // Always use the registered email from Firebase Auth
+      final registeredEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+      
       setState(() {
         _profile = profile;
         _fullNameController.text = profile.fullName;
         _selectedDepartment = profile.department.isEmpty ? null : profile.department;
         _contactController.text = profile.contactNumber;
-        _emailController.text = profile.email;
+        _emailController.text = registeredEmail; // Use Firebase Auth email
         _addressController.text = profile.address;
         _isLoading = false;
       });
@@ -119,17 +124,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Complete Your Profile'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        title: const Text(
+          'Complete Your Profile',
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: AppTheme.fontWeightBold,
+            color: Colors.white,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primary, AppTheme.primaryPressed],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppTheme.spacing24),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 600),
@@ -139,13 +161,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildHeader(),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: AppTheme.spacing24),
                         _buildFormCard(),
                         if (_error != null) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppTheme.spacing16),
                           _buildErrorBox(),
                         ],
-                        const SizedBox(height: 24),
+                        const SizedBox(height: AppTheme.spacing24),
                         _buildSaveButton(),
                       ],
                     ),
@@ -160,24 +182,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final isComplete = _profile?.isCompleted ?? false;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppTheme.spacing24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isComplete
-              ? [Colors.green.shade400, Colors.teal.shade400]
-              : [Colors.orange.shade400, Colors.deepOrange.shade400],
+        gradient: const LinearGradient(
+          colors: [AppTheme.primary, AppTheme.primaryPressed],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppTheme.spacing12),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
             ),
             child: Icon(
               isComplete ? Icons.verified_user : Icons.person_add,
@@ -185,7 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               size: 32,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppTheme.spacing16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,19 +213,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   isComplete ? 'Profile Complete' : 'Complete Your Profile',
                   style: const TextStyle(
+                    fontFamily: AppTheme.fontFamily,
                     color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                    fontSize: AppTheme.fontSizeCardHeader,
+                    fontWeight: AppTheme.fontWeightBold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppTheme.spacing4),
                 Text(
                   isComplete
                       ? 'You can lend and borrow items'
                       : 'Required for lending and borrowing',
                   style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
                     color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
+                    fontSize: AppTheme.fontSizeLabel,
                   ),
                 ),
               ],
@@ -218,49 +240,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildFormCard() {
     return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
-        ],
-      ),
+      padding: const EdgeInsets.all(AppTheme.spacing24),
+      decoration: AppTheme.cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'Personal Information',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: AppTheme.sectionTitle,
           ),
-          const SizedBox(height: 8),
-          Text(
+          const SizedBox(height: AppTheme.spacing8),
+          const Text(
             'This information helps build trust in the community.',
-            style: TextStyle(color: Colors.grey.shade600),
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              color: AppTheme.textSecondary,
+              fontSize: AppTheme.fontSizeLabel,
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppTheme.spacing24),
 
           // Full Name
           TextFormField(
             controller: _fullNameController,
-            decoration: InputDecoration(
-              labelText: 'Full Name *',
-              hintText: 'Enter your full name',
-              prefixIcon: const Icon(Icons.person),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            decoration: AppTheme.inputDecoration(
+              label: 'Full Name *',
+              hint: 'Enter your full name',
+              prefixIcon: const Icon(Icons.person, color: AppTheme.textSecondary),
             ),
             validator: (value) => value?.trim().isEmpty ?? true ? 'Full name is required' : null,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppTheme.spacing16),
 
           // Department - Dropdown only
           DropdownButtonFormField<String>(
             value: _selectedDepartment,
-            decoration: InputDecoration(
-              labelText: 'Department *',
-              hintText: 'Select your department',
-              prefixIcon: const Icon(Icons.school),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            decoration: AppTheme.inputDecoration(
+              label: 'Department *',
+              hint: 'Select your department',
+              prefixIcon: const Icon(Icons.school, color: AppTheme.textSecondary),
             ),
             items: departments.map((dept) {
               return DropdownMenuItem(value: dept, child: Text(dept));
@@ -270,17 +288,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
             validator: (value) => value == null ? 'Department is required' : null,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppTheme.spacing16),
 
           // Contact Number
           TextFormField(
             controller: _contactController,
             keyboardType: TextInputType.phone,
-            decoration: InputDecoration(
-              labelText: 'Contact Number *',
-              hintText: '10-digit mobile number',
-              prefixIcon: const Icon(Icons.phone),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            decoration: AppTheme.inputDecoration(
+              label: 'Contact Number *',
+              hint: '10-digit mobile number',
+              prefixIcon: const Icon(Icons.phone, color: AppTheme.textSecondary),
             ),
             validator: (value) {
               if (value?.trim().isEmpty ?? true) return 'Contact number is required';
@@ -288,35 +305,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppTheme.spacing16),
 
-          // Email
+          // Email - Read-only, from Firebase Auth
           TextFormField(
             controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              labelText: 'Email ID *',
-              hintText: 'your.email@college.edu',
-              prefixIcon: const Icon(Icons.email),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            readOnly: true,
+            enabled: false,
+            style: const TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              color: AppTheme.textSecondary,
             ),
-            validator: (value) {
-              if (value?.trim().isEmpty ?? true) return 'Email is required';
-              if (!value!.contains('@')) return 'Please enter a valid email';
-              return null;
-            },
+            decoration: AppTheme.inputDecoration(
+              label: 'Email ID (from registration)',
+              hint: '',
+              prefixIcon: const Icon(Icons.email, color: AppTheme.textSecondary),
+              suffixIcon: const Tooltip(
+                message: 'Email cannot be changed',
+                child: Icon(Icons.lock_outline, color: AppTheme.textDisabled, size: 18),
+              ),
+            ).copyWith(
+              filled: true,
+              fillColor: AppTheme.disabledBackground,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppTheme.spacing16),
 
           // Address - Free text again
           TextFormField(
             controller: _addressController,
             maxLines: 2,
-            decoration: InputDecoration(
-              labelText: 'Address / Hostel / Block *',
-              hintText: 'e.g., Nile Hostel Room 305, Off-campus',
-              prefixIcon: const Icon(Icons.location_on),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            decoration: AppTheme.inputDecoration(
+              label: 'Address / Hostel / Block *',
+              hint: 'e.g., Nile Hostel Room 305, Off-campus',
+              prefixIcon: const Icon(Icons.location_on, color: AppTheme.textSecondary),
             ),
             validator: (value) => value?.trim().isEmpty ?? true ? 'Address is required' : null,
           ),
@@ -327,18 +349,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildErrorBox() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppTheme.spacing12),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade200),
+        color: AppTheme.danger.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+        border: Border.all(color: AppTheme.danger.withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade700),
-          const SizedBox(width: 8),
+          const Icon(Icons.error_outline, color: AppTheme.danger),
+          const SizedBox(width: AppTheme.spacing8),
           Expanded(
-            child: Text(_error!, style: TextStyle(color: Colors.red.shade700)),
+            child: Text(
+              _error!,
+              style: const TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                color: AppTheme.danger,
+                fontSize: AppTheme.fontSizeLabel,
+              ),
+            ),
           ),
         ],
       ),
@@ -347,7 +376,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildSaveButton() {
     return SizedBox(
-      height: 56,
+      height: 48,
       child: ElevatedButton.icon(
         onPressed: _isSaving ? null : _saveProfile,
         icon: _isSaving
@@ -361,13 +390,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               )
             : const Icon(Icons.save),
         label: Text(_isSaving ? 'Saving...' : 'Save Profile'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.teal,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+        style: AppTheme.primaryButtonStyle,
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
 import 'services/item_service.dart';
+import 'app_theme.dart';
 
 class PostItemScreen extends StatefulWidget {
   const PostItemScreen({super.key});
@@ -122,12 +123,18 @@ class _PostItemScreenState extends State<PostItemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Post New Item'),
+        title: const Text(
+          'Post New Item',
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: AppTheme.fontWeightBold,
+          ),
+        ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: AppTheme.cardBackground,
+        foregroundColor: AppTheme.textPrimary,
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),

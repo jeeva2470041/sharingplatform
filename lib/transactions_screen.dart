@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'models/transaction.dart';
+import 'app_theme.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
@@ -145,13 +146,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   Color _getItemStatusColor(int index) {
     switch (index) {
-      case 0: return Colors.green;
-      case 1: return Colors.orange;
-      case 2: return Colors.blue;
-      case 3: return Colors.purple;
-      case 4: return Colors.teal;
-      case 5: return Colors.grey;
-      default: return Colors.grey;
+      case 0: return AppTheme.success;
+      case 1: return AppTheme.warning;
+      case 2: return AppTheme.primary;
+      case 3: return AppTheme.primaryPressed;
+      case 4: return AppTheme.success;
+      case 5: return AppTheme.textSecondary;
+      default: return AppTheme.textSecondary;
     }
   }
 
@@ -167,11 +168,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   Color _getTransactionStatusColor(TransactionStatus status) {
     switch (status) {
-      case TransactionStatus.requested: return Colors.orange;
-      case TransactionStatus.approved: return Colors.blue;
-      case TransactionStatus.active: return Colors.purple;
-      case TransactionStatus.completed: return Colors.green;
-      case TransactionStatus.cancelled: return Colors.red;
+      case TransactionStatus.requested: return AppTheme.warning;
+      case TransactionStatus.approved: return AppTheme.primary;
+      case TransactionStatus.active: return AppTheme.primaryPressed;
+      case TransactionStatus.completed: return AppTheme.success;
+      case TransactionStatus.cancelled: return AppTheme.danger;
     }
   }
 
@@ -206,8 +207,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Transactions'),
+        title: const Text(
+          'Transactions',
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: AppTheme.fontWeightBold,
+          ),
+        ),
+        backgroundColor: AppTheme.cardBackground,
+        foregroundColor: AppTheme.textPrimary,
         elevation: 0,
         actions: [
           IconButton(
@@ -218,13 +228,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : _allTransactions.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(
+                  color: AppTheme.primary,
                   onRefresh: _loadAllTransactions,
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppTheme.spacing16),
                     itemCount: _allTransactions.length,
                     itemBuilder: (context, index) {
                       return _TransactionCard(
@@ -242,22 +253,24 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history, size: 80, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
+          Icon(Icons.history, size: 80, color: AppTheme.textDisabled),
+          const SizedBox(height: AppTheme.spacing16),
+          const Text(
             'No transactions yet',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade600,
+              fontFamily: AppTheme.fontFamily,
+              fontSize: AppTheme.fontSizeSectionTitle,
+              fontWeight: AppTheme.fontWeightBold,
+              color: AppTheme.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
+          const SizedBox(height: AppTheme.spacing8),
+          const Text(
             'Your posting, lending, and borrowing\nhistory will appear here',
             style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
+              fontFamily: AppTheme.fontFamily,
+              fontSize: AppTheme.fontSizeLabel,
+              color: AppTheme.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -304,9 +317,9 @@ class _TransactionEntry {
 
   Color get typeColor {
     switch (type) {
-      case TransactionType.posted: return Colors.blue;
-      case TransactionType.lent: return Colors.teal;
-      case TransactionType.borrowed: return Colors.orange;
+      case TransactionType.posted: return AppTheme.primary;
+      case TransactionType.lent: return AppTheme.success;
+      case TransactionType.borrowed: return AppTheme.warning;
     }
   }
 
@@ -330,12 +343,11 @@ class _TransactionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppTheme.spacing12),
+      decoration: AppTheme.cardDecoration,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppTheme.spacing16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

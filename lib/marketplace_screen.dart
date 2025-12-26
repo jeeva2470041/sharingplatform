@@ -8,6 +8,7 @@ import 'widgets/profile_guard.dart';
 import 'chat_screen.dart';
 import 'services/item_service.dart';
 import 'services/transaction_service.dart';
+import 'app_theme.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
@@ -35,41 +36,34 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text(
           'Find Items',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: AppTheme.fontWeightBold,
+          ),
         ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: AppTheme.cardBackground,
+        foregroundColor: AppTheme.textPrimary,
       ),
       body: Column(
         children: [
           Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            color: AppTheme.cardBackground,
+            padding: const EdgeInsets.fromLTRB(AppTheme.spacing16, 0, AppTheme.spacing16, AppTheme.spacing16),
             child: TextField(
               onChanged: (value) {
                 setState(() {
                   _searchQuery = value;
                 });
               },
-              decoration: InputDecoration(
-                hintText: 'Search items...',
-                hintStyle: TextStyle(color: Colors.grey.shade400),
-                prefixIcon: const Icon(Icons.search, color: Colors.teal),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.teal.shade50.withOpacity(0.5),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
-                ),
+              decoration: AppTheme.inputDecoration(
+                label: '',
+                hint: 'Search items...',
+                prefixIcon: const Icon(Icons.search, color: AppTheme.primary),
               ),
             ),
           ),

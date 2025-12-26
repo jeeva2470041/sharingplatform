@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
+import 'app_theme.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -66,13 +67,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Account created successfully!'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.success,
         ),
       );
     } else {
       // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.red),
+        SnackBar(content: Text(error), backgroundColor: AppTheme.danger),
       );
     }
 
@@ -91,19 +92,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.cardBackground,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing24, vertical: AppTheme.spacing16),
             child: Form(
               key: _formKey,
               onChanged: () => setState(() {}),
@@ -113,19 +114,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text(
                     'Create Account',
                     style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
                       fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.teal,
+                      fontWeight: AppTheme.fontWeightBold,
+                      color: AppTheme.primary,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
+                  const SizedBox(height: AppTheme.spacing8),
+                  const Text(
                     'Join the community and start sharing!',
-                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: AppTheme.fontSizeBody,
+                      color: AppTheme.textSecondary,
+                    ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: AppTheme.spacing32),
 
                   _buildTextField(
                     controller: _nameController,
