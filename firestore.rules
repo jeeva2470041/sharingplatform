@@ -30,5 +30,18 @@ service cloud.firestore {
     match /chats/{itemId} {
       allow read, write: if request.auth != null;
     }
+    
+    // Transactions collection - for lending workflow
+    // Simplified for demo - in production, add proper user validation
+    match /transactions/{transactionId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // User profiles collection - for accountability
+    // Users can only read/write their own profile
+    match /profiles/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }

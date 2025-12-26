@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'post_item_screen.dart';
 import 'marketplace_screen.dart';
 import 'chat_screen.dart';
+import 'qr_handover_screen.dart';
+import 'return_qr_screen.dart';
+import 'profile_screen.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
 import 'widgets/status_badge.dart';
+import 'widgets/profile_guard.dart';
 import 'services/auth_service.dart';
 import 'services/item_service.dart';
+import 'services/transaction_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -46,12 +50,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Sync wallet from completed transactions
+    // This handles the case where lender confirmed return on their browser
+    TransactionService.syncWalletFromTransactions().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            tooltip: 'My Profile',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign Out',
@@ -226,6 +250,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     icon: Icons.add_circle_outline,
                     color: Colors.blue,
                     onTap: () async {
+                      // Check profile completion before allowing lending
+                      final canProceed =
+                          await ProfileGuard.checkProfileComplete(
+                            context,
+                            actionType: 'lend',
+                          );
+                      if (!canProceed) return;
+
+                      if (!context.mounted) return;
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -269,22 +302,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.notification_important, color: Colors.orange, size: 24),
+                        const Icon(
+                          Icons.notification_important,
+                          color: Colors.orange,
+                          size: 24,
+                        ),
                         const SizedBox(width: 8),
                         const Text(
                           'Pending Requests',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.orange,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '${pendingItems.length}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
@@ -326,13 +373,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                 }
                 return Column(
-                  children: items.map(
-                    (item) => _ActivityItemCard(
-                      item: item,
-                      isOwner: true,
-                      onUpdate: () {}, // No longer needed with StreamBuilder
-                    ),
-                  ).toList(),
+                  children: items
+                      .map(
+                        (item) => _ActivityItemCard(
+                          item: item,
+                          isOwner: true,
+                          onUpdate:
+                              () {}, // No longer needed with StreamBuilder
+                        ),
+                      )
+                      .toList(),
                 );
               },
             ),
@@ -361,13 +411,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                 }
                 return Column(
-                  children: items.map(
-                    (item) => _ActivityItemCard(
-                      item: item,
-                      isBorrowed: true,
-                      onUpdate: () {}, // No longer needed with StreamBuilder
-                    ),
-                  ).toList(),
+                  children: items
+                      .map(
+                        (item) => _ActivityItemCard(
+                          item: item,
+                          isBorrowed: true,
+                          onUpdate:
+                              () {}, // No longer needed with StreamBuilder
+                        ),
+                      )
+                      .toList(),
                 );
               },
             ),
@@ -476,34 +529,48 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
 
   Future<void> _approveRequest() async {
     try {
-      await ItemService.approveRequest(widget.item.id);
+      // First, find the transaction for this item and approve it
+      final transaction = await TransactionService.getTransactionForItem(
+        widget.item.id,
+      );
+      if (transaction != null) {
+        // Use TransactionService which updates both transaction and item status
+        await TransactionService.approveRequest(transaction.id);
+      } else {
+        // Fallback to just updating item status
+        await ItemService.approveRequest(widget.item.id);
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Request approved'),
+          content: Text(
+            'Request approved! You can now generate QR for handover.',
+          ),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to approve: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to approve: $e')));
     }
   }
 
   Future<void> _rejectRequest() async {
     try {
-      // Unlock deposit and refund to BORROWER's wallet (not current user's)
-      final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
-      if (depositAmount > 0 && widget.item.borrowerId != null) {
-        final borrowerWallet = MockData.getWalletForUser(widget.item.borrowerId!);
-        borrowerWallet.releaseDeposit(depositAmount);
-        await MockData.saveWallet();
+      // Find the transaction for this item and reject it
+      final transaction = await TransactionService.getTransactionForItem(
+        widget.item.id,
+      );
+      if (transaction != null) {
+        await TransactionService.rejectRequest(transaction.id);
+      } else {
+        // Fallback to just updating item status
+        await ItemService.rejectRequest(widget.item.id);
       }
-
-      await ItemService.rejectRequest(widget.item.id);
+      // Note: No deposit release needed - credits aren't locked until QR handover
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -514,9 +581,9 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to reject: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to reject: $e')));
     }
   }
 
@@ -528,7 +595,9 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
 
       if (depositAmount > 0 && widget.item.borrowerId != null) {
         // Get borrower's and lender's wallets
-        final borrowerWallet = MockData.getWalletForUser(widget.item.borrowerId!);
+        final borrowerWallet = MockData.getWalletForUser(
+          widget.item.borrowerId!,
+        );
         final lenderWallet = MockData.getWalletForUser(
           currentUserId,
         ); // Owner is the lender
@@ -553,9 +622,9 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to settle: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to settle: $e')));
     }
   }
 
@@ -585,6 +654,113 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
         ),
       ),
     );
+  }
+
+  /// Open QR handover screen for physical item verification
+  Future<void> _openHandover({required bool isLender}) async {
+    // Find transaction for this item
+    try {
+      final transaction = await TransactionService.getTransactionForItem(
+        widget.item.id,
+      );
+
+      if (transaction == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No active transaction found for this item'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QrHandoverScreen(
+            transactionId: transaction.id,
+            isLender: isLender,
+          ),
+        ),
+      );
+
+      if (result == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Handover completed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  /// Open QR return screen for secure item return
+  Future<void> _openReturn({required bool isBorrower}) async {
+    // Verify user is authenticated first
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in again to continue'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final transaction = await TransactionService.getTransactionForItem(
+        widget.item.id,
+      );
+
+      if (transaction == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No active transaction found for this item'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ReturnQrScreen(
+            transactionId: transaction.id,
+            isBorrower: isBorrower,
+          ),
+        ),
+      );
+
+      if (result == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Return completed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      print('Return error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _showReviewDialog() {
@@ -705,19 +881,33 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
   Widget build(BuildContext context) {
     final bool showRequestActions =
         widget.isOwner && widget.item.status == ItemStatus.requested;
-    final bool showSettlementActions =
+    // Lender can initiate handover when approved
+    final bool showLenderHandover =
         widget.isOwner && widget.item.status == ItemStatus.approved;
+    // Borrower can scan QR when approved
+    final bool showBorrowerHandover =
+        widget.isBorrowed && widget.item.status == ItemStatus.approved;
+    // Borrower can initiate return when active
+    final bool showBorrowerReturn =
+        widget.isBorrowed && widget.item.status == ItemStatus.active;
+    // Lender can confirm return (scan borrower's return QR) when active
+    final bool showLenderReturnConfirm =
+        widget.isOwner && widget.item.status == ItemStatus.active;
     final bool isApproved = widget.item.status == ItemStatus.approved;
+    final bool isActive = widget.item.status == ItemStatus.active;
     final bool canChat =
         (widget.item.status == ItemStatus.requested ||
-        widget.item.status == ItemStatus.approved);
+        widget.item.status == ItemStatus.approved ||
+        widget.item.status == ItemStatus.active);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: isApproved
+        border: isActive
+            ? Border.all(color: Colors.teal.withOpacity(0.4), width: 2)
+            : isApproved
             ? Border.all(color: Colors.green.withOpacity(0.3), width: 1)
             : null,
         boxShadow: [
@@ -836,34 +1026,221 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
                 ),
               ),
             ],
-            // Settlement action for lender when item is approved but damaged/kept
-            if (showSettlementActions) ...[
+            // Lender handover action - show QR code
+            if (showLenderHandover) ...[
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Item Actions',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.blue.shade700,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Credits will be locked from borrower only after QR verification',
+                            style: TextStyle(
+                              color: Colors.blue.shade800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _settleItem,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.orange,
-                      side: const BorderSide(color: Colors.orange),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => _openHandover(isLender: true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: const Icon(Icons.gavel, size: 18),
-                    label: const Text('Settle (Claim Deposit)'),
+                    icon: const Icon(Icons.qr_code, size: 20),
+                    label: const Text('Confirm Handover (Show QR)'),
+                  ),
+                ],
+              ),
+            ],
+            // Borrower handover action - scan QR code
+            if (showBorrowerHandover) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber,
+                          color: Colors.orange.shade700,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Scan the lender\'s QR code when you receive the item. Your credits will be locked.',
+                            style: TextStyle(
+                              color: Colors.orange.shade800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => _openHandover(isLender: false),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.qr_code_scanner, size: 20),
+                    label: const Text('Scan QR to Receive Item'),
+                  ),
+                ],
+              ),
+            ],
+            // Borrower return action - generate Return QR
+            if (showBorrowerReturn) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.lock,
+                              size: 14,
+                              color: Colors.teal.shade700,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '₹${widget.item.deposit} Locked',
+                              style: TextStyle(
+                                color: Colors.teal.shade700,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => _openReturn(isBorrower: true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.assignment_return, size: 20),
+                    label: const Text('Return Item (Show QR)'),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Show the Return QR to lender to get your deposit back',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ],
+            // Lender return confirmation - scan Return QR
+            if (showLenderReturnConfirm) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lock, color: Colors.teal.shade700, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Deposit ₹${widget.item.deposit} locked from borrower',
+                            style: TextStyle(
+                              color: Colors.teal.shade800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => _openReturn(isBorrower: false),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.qr_code_scanner, size: 20),
+                    label: const Text('Confirm Return (Scan QR)'),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Scan borrower\'s Return QR to verify item condition',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),

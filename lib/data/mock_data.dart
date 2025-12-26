@@ -8,6 +8,9 @@ class MockData {
   /// Per-user wallets stored by userId
   static Map<String, UserWallet> _userWallets = {};
 
+  /// Flag to track if wallet has been loaded this session
+  static bool _walletLoaded = false;
+
   /// Get current user's wallet (creates default if not exists)
   static UserWallet get userWallet {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
@@ -56,29 +59,41 @@ class MockData {
   }
 
   /// Load all user wallets from SharedPreferences
-  static Future<void> loadWallet() async {
+  /// Only loads once per session to prevent overwriting corrected values
+  /// Set forceReload=true to reload from disk (use with caution)
+  static Future<void> loadWallet({bool forceReload = false}) async {
+    // Skip if already loaded this session (unless forced)
+    if (_walletLoaded && !forceReload) {
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final walletsJson = prefs.getString('user_wallets');
     if (walletsJson != null) {
       final Map<String, dynamic> data = jsonDecode(walletsJson);
-      _userWallets = data.map((key, value) =>
-          MapEntry(key, UserWallet.fromJson(value as Map<String, dynamic>)));
+      _userWallets = data.map(
+        (key, value) =>
+            MapEntry(key, UserWallet.fromJson(value as Map<String, dynamic>)),
+      );
     }
+    _walletLoaded = true;
   }
 
   /// Save items to SharedPreferences
   static Future<void> saveItems() async {
     final prefs = await SharedPreferences.getInstance();
-    final itemsJson =
-        allItems.map((item) => jsonEncode(item.toJson())).toList();
+    final itemsJson = allItems
+        .map((item) => jsonEncode(item.toJson()))
+        .toList();
     await prefs.setStringList('items', itemsJson);
   }
 
   /// Save all user wallets to SharedPreferences
   static Future<void> saveWallet() async {
     final prefs = await SharedPreferences.getInstance();
-    final walletsData = _userWallets.map((key, value) =>
-        MapEntry(key, value.toJson()));
+    final walletsData = _userWallets.map(
+      (key, value) => MapEntry(key, value.toJson()),
+    );
     await prefs.setString('user_wallets', jsonEncode(walletsData));
   }
 

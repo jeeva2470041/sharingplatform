@@ -15,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   String _errorMessage = '';
   bool _isPasswordVisible = false;
- 
+
   Future<void> _login() async {
     setState(() {
       _errorMessage = '';
@@ -24,17 +24,14 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    if (!email.endsWith('@ssn.edu.in')) {
+    if (!email.endsWith('@xyz.edu.in')) {
       setState(() {
-        _errorMessage = 'Only SSN college students are allowed';
+        _errorMessage = 'Only @xyz.edu.in email IDs are allowed.';
       });
       return;
     }
 
-    final error = await AuthService().login(
-      email: email,
-      password: password,
-    );
+    final error = await AuthService().login(email: email, password: password);
 
     if (!mounted) return;
 
@@ -46,29 +43,40 @@ class _LoginScreenState extends State<LoginScreen> {
     // Success: Firebase authStateChanges will redirect automatically
   }
 
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    
+
     return Scaffold(
       body: Stack(
         children: [
           // Background Image
           Positioned.fill(
-            child: Image.asset(
-              'assets/ssn_college.jpg',
+            child: Image.network(
+              'https://search.brave.com/images?q=college+image',
               fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.teal.shade800, Colors.teal.shade400],
+                    ),
+                  ),
+                  child: const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                );
+              },
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Colors.blue.shade700,
-                        Colors.teal.shade500,
-                      ],
+                      colors: [Colors.teal.shade800, Colors.teal.shade400],
                     ),
                   ),
                 );
@@ -77,9 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           // Dark Overlay
           Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.4),
-            ),
+            child: Container(color: Colors.black.withOpacity(0.4)),
           ),
           // Login Card
           Center(
@@ -94,12 +100,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.85),
+                      color: Colors.white.withOpacity(0.95),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
+                        color: Colors.teal.shade100,
                         width: 1.5,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.teal.shade900.withOpacity(0.2),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(32.0),
@@ -199,7 +212,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (context) => const RegisterScreen()),
+                                  builder: (context) => const RegisterScreen(),
+                                ),
                               );
                             },
                             style: TextButton.styleFrom(

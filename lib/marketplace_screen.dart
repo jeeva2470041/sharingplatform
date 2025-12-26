@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
 import 'widgets/status_badge.dart';
 import 'widgets/rating_dialog.dart';
+import 'widgets/profile_guard.dart';
 import 'chat_screen.dart';
 import 'services/item_service.dart';
+import 'services/transaction_service.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
@@ -77,9 +78,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               stream: ItemService.marketplaceItemsStream,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Error: ${snapshot.error}'),
-                  );
+                  return Center(child: Text('Error: ${snapshot.error}'));
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -162,7 +161,14 @@ class _ItemCardState extends State<ItemCard> {
     }
   }
 
-  void _requestItem() {
+  Future<void> _requestItem() async {
+    // Check profile completion before allowing borrowing
+    final canProceed = await ProfileGuard.checkProfileComplete(
+      context,
+      actionType: 'borrow',
+    );
+    if (!canProceed) return;
+
     // Check if user is trying to borrow their own item
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
 
@@ -268,12 +274,10 @@ class _ItemCardState extends State<ItemCard> {
 
   Future<void> _processRequest() async {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
-
-    // Get borrower's wallet (current user)
-    final borrowerWallet = MockData.getWalletForUser(currentUserId);
     final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
 
-    // Check if borrower has enough balance
+    // Check if borrower has enough balance (for later, after QR verification)
+    final borrowerWallet = MockData.getWalletForUser(currentUserId);
     if (depositAmount > 0 && borrowerWallet.balance < depositAmount) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -286,21 +290,22 @@ class _ItemCardState extends State<ItemCard> {
     }
 
     try {
-      // Update item in Firestore
-      await ItemService.requestItem(widget.item.id);
-
-      // Lock deposit in borrower's wallet (deduct from balance, add to lockedDeposit)
-      if (depositAmount > 0) {
-        borrowerWallet.lockDeposit(depositAmount);
-        await MockData.saveWallet();
-      }
+      // Create request using TransactionService - NO CREDITS DEDUCTED
+      await TransactionService.createRequest(
+        itemId: widget.item.id,
+        itemName: widget.item.name,
+        lenderId: widget.item.ownerId,
+        depositAmount: depositAmount,
+      );
 
       if (!mounted) return;
 
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -314,14 +319,14 @@ class _ItemCardState extends State<ItemCard> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Lender will review your request',
+                'Lender will review your request.\nCredits will be locked only after handover.',
                 style: TextStyle(color: Colors.black54),
                 textAlign: TextAlign.center,
               ),
               if (depositAmount > 0) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Deposit of ₹$depositAmount locked',
+                  'Deposit: ₹$depositAmount (not yet deducted)',
                   style: const TextStyle(
                     color: Colors.orange,
                     fontWeight: FontWeight.w500,
@@ -343,9 +348,9 @@ class _ItemCardState extends State<ItemCard> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to request item: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to request item: $e')));
     }
   }
 

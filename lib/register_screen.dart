@@ -140,8 +140,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _emailController,
                     label: 'Email Address',
                     icon: Icons.email_outlined,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Enter your email' : null,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Enter your email';
+                      if (!v.endsWith('@xyz.edu.in')) {
+                        return 'Only @xyz.edu.in email IDs are allowed.';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
 

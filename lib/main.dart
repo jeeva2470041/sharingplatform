@@ -12,12 +12,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Optional: keep mock items for now
   await MockData.loadItems();
+  await MockData.loadWallet();
 
   runApp(const MyApp());
 }
@@ -44,7 +43,7 @@ class MyApp extends StatelessWidget {
           if (snapshot.hasData) {
             return const DashboardScreen();
           }
-          
+
           // No user logged in or still loading - show login
           // connectionState.waiting will be very brief now
           if (snapshot.connectionState == ConnectionState.waiting) {

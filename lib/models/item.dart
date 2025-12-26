@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum ItemStatus { available, requested, approved, returned, settled }
+enum ItemStatus { available, requested, approved, active, returned, settled }
 
 class Item {
   final String id;
@@ -35,6 +35,8 @@ class Item {
         return 'Requested';
       case ItemStatus.approved:
         return 'Approved';
+      case ItemStatus.active:
+        return 'Active';
       case ItemStatus.returned:
         return 'Returned';
       case ItemStatus.settled:
@@ -73,8 +75,8 @@ class Item {
       'ratingCount': ratingCount,
       // Use Timestamp.fromDate for consistent Firestore storage
       // Local DateTime ensures instant UI updates without serverTimestamp delay
-      'createdAt': createdAt != null 
-          ? Timestamp.fromDate(createdAt!) 
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
           : Timestamp.now(),
     };
   }
@@ -91,8 +93,8 @@ class Item {
       borrowerId: json['borrowerId'],
       rating: json['rating']?.toDouble(),
       ratingCount: json['ratingCount'],
-      createdAt: json['createdAt'] != null 
-          ? DateTime.parse(json['createdAt']) 
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
           : null,
     );
   }
@@ -101,7 +103,7 @@ class Item {
   /// Handles pending writes where timestamp may be null
   factory Item.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    
+
     // Handle createdAt - may be null for pending writes
     DateTime? createdAt;
     if (data['createdAt'] != null) {
@@ -112,7 +114,7 @@ class Item {
     }
     // Fallback to current time for documents with pending writes
     createdAt ??= DateTime.now();
-    
+
     return Item(
       id: doc.id,
       name: data['name'] ?? '',
