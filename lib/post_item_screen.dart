@@ -130,13 +130,23 @@ class _PostItemScreenState extends State<PostItemScreen> {
           style: TextStyle(
             fontFamily: AppTheme.fontFamily,
             fontWeight: AppTheme.fontWeightBold,
+            color: Colors.white,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primary, AppTheme.primaryPressed],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
         ),
         elevation: 0,
-        backgroundColor: AppTheme.cardBackground,
-        foregroundColor: AppTheme.textPrimary,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -172,7 +182,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                                 hintText: 'What are you sharing?',
                                 prefixIcon: const Icon(
                                   Icons.inventory_2_outlined,
-                                  color: Colors.teal,
+                                  color: AppTheme.primary,
                                 ),
                                 filled: true,
                                 fillColor: Colors.grey.shade50,
@@ -213,13 +223,13 @@ class _PostItemScreenState extends State<PostItemScreen> {
                                       ),
                                     ),
                                     selected: isSelected,
-                                    selectedColor: Colors.teal,
+                                    selectedColor: AppTheme.primary,
                                     backgroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),
                                       side: BorderSide(
                                         color: isSelected
-                                            ? Colors.teal
+                                            ? AppTheme.primary
                                             : Colors.grey.shade300,
                                       ),
                                     ),
@@ -248,17 +258,17 @@ class _PostItemScreenState extends State<PostItemScreen> {
                                   avatar: const Icon(
                                     Icons.add,
                                     size: 18,
-                                    color: Colors.teal,
+                                    color: AppTheme.primary,
                                   ),
                                   label: const Text(
                                     'New',
-                                    style: TextStyle(color: Colors.teal),
+                                    style: TextStyle(color: AppTheme.primary),
                                   ),
-                                  backgroundColor: Colors.teal.shade50,
+                                  backgroundColor: AppTheme.primary.withOpacity(0.1),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(20),
                                     side: BorderSide(
-                                      color: Colors.teal.withOpacity(0.5),
+                                      color: AppTheme.primary.withOpacity(0.5),
                                     ),
                                   ),
                                   onPressed: _addCategory,
@@ -279,7 +289,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                                 helperText: 'Amount locked during borrowing',
                                 prefixIcon: const Icon(
                                   Icons.currency_rupee,
-                                  color: Colors.teal,
+                                  color: AppTheme.primary,
                                 ),
                                 filled: true,
                                 fillColor: Colors.grey.shade50,
@@ -315,7 +325,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                           width: 56,
                           height: 56,
                           decoration: BoxDecoration(
-                            color: Colors.teal.shade50,
+                            color: AppTheme.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -324,7 +334,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                                 : _selectedCategory == 'Notes'
                                 ? Icons.notes_outlined
                                 : Icons.menu_book_outlined,
-                            color: Colors.teal,
+                            color: AppTheme.primary,
                             size: 28,
                           ),
                         ),
@@ -372,16 +382,16 @@ class _PostItemScreenState extends State<PostItemScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.green.shade50,
+                            color: AppTheme.success.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: Colors.green.withOpacity(0.2),
+                              color: AppTheme.success.withOpacity(0.3),
                             ),
                           ),
                           child: const Text(
                             'Available',
                             style: TextStyle(
-                              color: Colors.green,
+                              color: AppTheme.success,
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -412,9 +422,9 @@ class _PostItemScreenState extends State<PostItemScreen> {
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.teal.shade200,
+                    disabledBackgroundColor: AppTheme.primary.withOpacity(0.5),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),

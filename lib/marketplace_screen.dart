@@ -43,11 +43,21 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           style: TextStyle(
             fontFamily: AppTheme.fontFamily,
             fontWeight: AppTheme.fontWeightBold,
+            color: Colors.white,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primary, AppTheme.primaryPressed],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
         ),
         elevation: 0,
-        backgroundColor: AppTheme.cardBackground,
-        foregroundColor: AppTheme.textPrimary,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
@@ -304,7 +314,7 @@ class _ItemCardState extends State<ItemCard> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.check_circle, color: Colors.teal, size: 56),
+              const Icon(Icons.check_circle, color: AppTheme.primary, size: 56),
               const SizedBox(height: 16),
               const Text(
                 'Request Sent Successfully',
@@ -438,12 +448,12 @@ class _ItemCardState extends State<ItemCard> {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: Colors.teal.shade50,
+                    color: AppTheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     _categoryIcon(widget.item.category),
-                    color: Colors.teal,
+                    color: AppTheme.primary,
                     size: 28,
                   ),
                 ),
@@ -565,7 +575,7 @@ class _ItemCardState extends State<ItemCard> {
                     ElevatedButton(
                       onPressed: canRequest ? _requestItem : _returnItem,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: canRequest ? Colors.teal : Colors.blue,
+                        backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(
@@ -616,7 +626,7 @@ class _ItemCardState extends State<ItemCard> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: AppTheme.success.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Row(
@@ -624,14 +634,14 @@ class _ItemCardState extends State<ItemCard> {
                           Icon(
                             Icons.check_circle,
                             size: 16,
-                            color: Colors.green,
+                            color: AppTheme.success,
                           ),
                           SizedBox(width: 8),
                           Text(
                             'Approved',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.green,
+                              color: AppTheme.success,
                             ),
                           ),
                         ],

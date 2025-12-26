@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'data/mock_data.dart';
 import 'services/transaction_service.dart';
 import 'models/transaction.dart';
+import 'app_theme.dart';
+import 'widgets/qr_scanner_dialog.dart';
 
 /// Screen for QR code handover verification
 /// Lender generates and displays QR, Borrower scans to confirm physical handover
@@ -110,57 +112,11 @@ class _QrHandoverScreenState extends State<QrHandoverScreen> {
   }
 
   Future<void> _scanQrCode() async {
-    final codeController = TextEditingController();
-
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.qr_code_scanner, color: Colors.teal),
-            SizedBox(width: 12),
-            Text('Enter QR Code'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Ask the lender to show you their QR code and enter the code below:',
-              style: TextStyle(color: Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: codeController,
-              decoration: InputDecoration(
-                labelText: 'QR Code',
-                hintText: 'TXN_...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.qr_code),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context, codeController.text),
-            icon: const Icon(Icons.check),
-            label: const Text('Confirm Receipt'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
+    final result = await showQrScannerDialog(
+      context,
+      title: 'Scan Handover QR',
+      subtitle: 'Point your camera at the lender\'s QR code',
+      accentColor: AppTheme.primary,
     );
 
     if (result != null && result.isNotEmpty) {
@@ -212,11 +168,27 @@ class _QrHandoverScreenState extends State<QrHandoverScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Text(widget.isLender ? 'Handover Item' : 'Receive Item'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        title: Text(
+          widget.isLender ? 'Handover Item' : 'Receive Item',
+          style: const TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: AppTheme.fontWeightBold,
+            color: Colors.white,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primary, AppTheme.primaryPressed],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: _isLoading

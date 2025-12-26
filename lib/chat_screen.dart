@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'app_theme.dart';
 
 class ChatScreen extends StatefulWidget {
   final String itemId; // CRITICAL: Chat is item-specific
@@ -100,12 +101,12 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: Row(
           children: [
             const CircleAvatar(
-              backgroundColor: Colors.teal,
+              backgroundColor: Colors.white24,
               radius: 16,
               child: Icon(Icons.chat, size: 18, color: Colors.white),
             ),
@@ -116,11 +117,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   const Text(
                     'Chat',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
                   ),
                   Text(
                     widget.itemName,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -128,9 +129,18 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primary, AppTheme.primaryPressed],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [

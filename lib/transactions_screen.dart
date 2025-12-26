@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'models/transaction.dart';
 import 'app_theme.dart';
 
+// Filter options for transactions
+enum TransactionFilter { pending, active, completed, cancelled, all }
+
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
 
@@ -15,8 +18,71 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   final _firestore = FirebaseFirestore.instance;
   bool _isLoading = true;
   List<_TransactionEntry> _allTransactions = [];
+  TransactionFilter _selectedFilter = TransactionFilter.all;
 
   String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  // Get filtered transactions based on selected tab
+  List<_TransactionEntry> get _filteredTransactions {
+    switch (_selectedFilter) {
+      case TransactionFilter.pending:
+        return _allTransactions.where((t) => 
+          t.status == 'Requested' || t.status == 'Approved'
+        ).toList();
+      case TransactionFilter.active:
+        return _allTransactions.where((t) => t.status == 'Active').toList();
+      case TransactionFilter.completed:
+        return _allTransactions.where((t) => 
+          t.status == 'Completed' || t.status == 'Available' || t.status == 'Returned' || t.status == 'Settled'
+        ).toList();
+      case TransactionFilter.cancelled:
+        return _allTransactions.where((t) => t.status == 'Cancelled').toList();
+      case TransactionFilter.all:
+        return _allTransactions;
+    }
+  }
+
+  // Get count for each filter
+  int _getFilterCount(TransactionFilter filter) {
+    switch (filter) {
+      case TransactionFilter.pending:
+        return _allTransactions.where((t) => 
+          t.status == 'Requested' || t.status == 'Approved'
+        ).length;
+      case TransactionFilter.active:
+        return _allTransactions.where((t) => t.status == 'Active').length;
+      case TransactionFilter.completed:
+        return _allTransactions.where((t) => 
+          t.status == 'Completed' || t.status == 'Available' || t.status == 'Returned' || t.status == 'Settled'
+        ).length;
+      case TransactionFilter.cancelled:
+        return _allTransactions.where((t) => t.status == 'Cancelled').length;
+      case TransactionFilter.all:
+        return _allTransactions.length;
+    }
+  }
+
+  // Get filter label
+  String _getFilterLabel(TransactionFilter filter) {
+    switch (filter) {
+      case TransactionFilter.pending: return 'Pending';
+      case TransactionFilter.active: return 'Active';
+      case TransactionFilter.completed: return 'Completed';
+      case TransactionFilter.cancelled: return 'Cancelled';
+      case TransactionFilter.all: return 'All';
+    }
+  }
+
+  // Get filter badge color
+  Color _getFilterColor(TransactionFilter filter) {
+    switch (filter) {
+      case TransactionFilter.pending: return AppTheme.warning;
+      case TransactionFilter.active: return AppTheme.primary;
+      case TransactionFilter.completed: return AppTheme.success;
+      case TransactionFilter.cancelled: return AppTheme.danger;
+      case TransactionFilter.all: return const Color(0xFF6B7280);
+    }
+  }
 
   @override
   void initState() {
@@ -206,6 +272,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredList = _filteredTransactions;
+    
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -214,67 +282,233 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           style: TextStyle(
             fontFamily: AppTheme.fontFamily,
             fontWeight: AppTheme.fontWeightBold,
+            color: Colors.white,
           ),
         ),
-        backgroundColor: AppTheme.cardBackground,
-        foregroundColor: AppTheme.textPrimary,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primary, AppTheme.primaryPressed],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: _loadAllTransactions,
             tooltip: 'Refresh',
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-          : _allTransactions.isEmpty
-              ? _buildEmptyState()
-              : RefreshIndicator(
-                  color: AppTheme.primary,
-                  onRefresh: _loadAllTransactions,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(AppTheme.spacing16),
-                    itemCount: _allTransactions.length,
-                    itemBuilder: (context, index) {
-                      return _TransactionCard(
-                        entry: _allTransactions[index],
-                        formatFullDateTime: _formatFullDateTime,
-                      );
-                    },
+      body: Column(
+        children: [
+          // Header card with "All Transactions" title
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.all(AppTheme.spacing16),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBackground,
+              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Blue header bar
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spacing16,
+                    vertical: AppTheme.spacing12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5C6BC0),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(AppTheme.cardRadius),
+                      topRight: Radius.circular(AppTheme.cardRadius),
+                    ),
+                  ),
+                  child: const Text(
+                    'All Transactions',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: AppTheme.fontSizeBody,
+                      fontWeight: AppTheme.fontWeightSemibold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
+                // Filter tabs
+                Padding(
+                  padding: const EdgeInsets.all(AppTheme.spacing16),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: TransactionFilter.values.map((filter) {
+                        final isSelected = _selectedFilter == filter;
+                        final count = _getFilterCount(filter);
+                        final color = _getFilterColor(filter);
+                        
+                        return Padding(
+                          padding: const EdgeInsets.only(right: AppTheme.spacing8),
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _selectedFilter = filter;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppTheme.spacing12,
+                                vertical: AppTheme.spacing8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isSelected ? color : Colors.grey.shade300,
+                                  width: isSelected ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _getFilterLabel(filter),
+                                    style: TextStyle(
+                                      fontFamily: AppTheme.fontFamily,
+                                      fontSize: AppTheme.fontSizeLabel,
+                                      fontWeight: isSelected ? AppTheme.fontWeightSemibold : AppTheme.fontWeightMedium,
+                                      color: isSelected ? color : AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  // Count badge
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$count',
+                                      style: const TextStyle(
+                                        fontFamily: AppTheme.fontFamily,
+                                        fontSize: 11,
+                                        fontWeight: AppTheme.fontWeightBold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Transaction list
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                : filteredList.isEmpty
+                    ? _buildEmptyState()
+                    : RefreshIndicator(
+                        color: AppTheme.primary,
+                        onRefresh: _loadAllTransactions,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing16),
+                          itemCount: filteredList.length,
+                          itemBuilder: (context, index) {
+                            return _TransactionCard(
+                              entry: filteredList[index],
+                              formatFullDateTime: _formatFullDateTime,
+                            );
+                          },
+                        ),
+                      ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildEmptyState() {
+    final filterLabel = _getFilterLabel(_selectedFilter).toLowerCase();
+    final color = _getFilterColor(_selectedFilter);
+    
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.history, size: 80, color: AppTheme.textDisabled),
-          const SizedBox(height: AppTheme.spacing16),
-          const Text(
-            'No transactions yet',
-            style: TextStyle(
-              fontFamily: AppTheme.fontFamily,
-              fontSize: AppTheme.fontSizeSectionTitle,
-              fontWeight: AppTheme.fontWeightBold,
-              color: AppTheme.textSecondary,
+      child: Container(
+        margin: const EdgeInsets.all(AppTheme.spacing24),
+        padding: const EdgeInsets.all(AppTheme.spacing24),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _selectedFilter == TransactionFilter.all 
+                  ? Icons.history 
+                  : _selectedFilter == TransactionFilter.pending
+                      ? Icons.pending_actions
+                      : _selectedFilter == TransactionFilter.active
+                          ? Icons.sync
+                          : _selectedFilter == TransactionFilter.completed
+                              ? Icons.check_circle_outline
+                              : Icons.cancel_outlined,
+              size: 56,
+              color: color.withOpacity(0.6),
             ),
-          ),
-          const SizedBox(height: AppTheme.spacing8),
-          const Text(
-            'Your posting, lending, and borrowing\nhistory will appear here',
-            style: TextStyle(
-              fontFamily: AppTheme.fontFamily,
-              fontSize: AppTheme.fontSizeLabel,
-              color: AppTheme.textSecondary,
+            const SizedBox(height: AppTheme.spacing16),
+            Text(
+              _selectedFilter == TransactionFilter.all
+                  ? 'No transactions yet'
+                  : 'No $filterLabel transactions',
+              style: TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: AppTheme.fontSizeSectionTitle,
+                fontWeight: AppTheme.fontWeightBold,
+                color: AppTheme.textPrimary,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+            const SizedBox(height: AppTheme.spacing8),
+            Text(
+              _selectedFilter == TransactionFilter.all
+                  ? 'Your posting, lending, and borrowing\nhistory will appear here'
+                  : 'Transactions with $filterLabel status\nwill appear here',
+              style: const TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: AppTheme.fontSizeLabel,
+                color: AppTheme.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

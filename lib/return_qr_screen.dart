@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'data/mock_data.dart';
 import 'services/transaction_service.dart';
 import 'models/transaction.dart';
+import 'app_theme.dart';
+import 'widgets/qr_scanner_dialog.dart';
 
 /// Screen for QR-based return verification
 /// Borrower generates Return QR, Lender scans to confirm item return
@@ -112,57 +114,11 @@ class _ReturnQrScreenState extends State<ReturnQrScreen> {
   }
 
   Future<void> _scanReturnQr() async {
-    final codeController = TextEditingController();
-
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.qr_code_scanner, color: Colors.indigo),
-            SizedBox(width: 12),
-            Text('Enter Return QR'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Ask the borrower to show their Return QR code:',
-              style: TextStyle(color: Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: codeController,
-              decoration: InputDecoration(
-                labelText: 'Return QR Code',
-                hintText: 'RETURN_...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.qr_code),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context, codeController.text),
-            icon: const Icon(Icons.check),
-            label: const Text('Next'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.indigo,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
+    final result = await showQrScannerDialog(
+      context,
+      title: 'Scan Return QR',
+      subtitle: 'Point your camera at the borrower\'s QR code',
+      accentColor: AppTheme.success,
     );
 
     if (result != null && result.isNotEmpty) {
@@ -302,11 +258,27 @@ class _ReturnQrScreenState extends State<ReturnQrScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Text(widget.isBorrower ? 'Return Item' : 'Confirm Return'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        title: Text(
+          widget.isBorrower ? 'Return Item' : 'Confirm Return',
+          style: const TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: AppTheme.fontWeightBold,
+            color: Colors.white,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primary, AppTheme.primaryPressed],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: _isLoading
