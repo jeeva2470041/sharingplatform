@@ -406,6 +406,7 @@ class _ItemCardState extends State<ItemCard> {
         builder: (context) => ChatScreen(
           itemId: widget.item.id, // CRITICAL: Item-specific chat
           otherUserId: widget.item.ownerId,
+          otherUserName: widget.item.ownerName ?? 'Lender',
           itemName: widget.item.name,
         ),
       ),
@@ -478,6 +479,29 @@ class _ItemCardState extends State<ItemCard> {
                             ),
                           ),
                           StatusBadge(status: widget.item.status),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline,
+                            size: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Lender: ${widget.item.ownerName ?? 'Unknown'}',
+                              style: TextStyle(
+                                color: AppTheme.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),

@@ -6,12 +6,14 @@ import 'app_theme.dart';
 class ChatScreen extends StatefulWidget {
   final String itemId; // CRITICAL: Chat is item-specific
   final String otherUserId; // The other user in the chat (lender or borrower)
+  final String otherUserName; // Display name of the other user
   final String itemName; // For display purposes
 
   const ChatScreen({
     super.key,
     required this.itemId,
     required this.otherUserId,
+    this.otherUserName = 'User',
     required this.itemName,
   });
 
@@ -105,24 +107,36 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               backgroundColor: Colors.white24,
               radius: 16,
-              child: Icon(Icons.chat, size: 18, color: Colors.white),
+              child: Text(
+                widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Chat',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-                  ),
                   Text(
-                    widget.itemName,
-                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    widget.otherUserName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
                     overflow: TextOverflow.ellipsis,
+                  ),
+                  Row(
+                    children: [
+                      Icon(Icons.inventory_2_outlined, size: 12, color: Colors.white70),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          widget.itemName,
+                          style: const TextStyle(fontSize: 12, color: Colors.white70),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -81,7 +81,9 @@ class _PostItemScreenState extends State<PostItemScreen> {
       _isSubmitting = true;
     });
 
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    final user = FirebaseAuth.instance.currentUser;
+    final currentUserId = user?.uid ?? 'unknown';
+    final currentUserName = user?.displayName ?? user?.email?.split('@').first ?? 'Anonymous';
 
     // Add new item to Firestore (shared across all users)
     final newItem = Item(
@@ -92,6 +94,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
           ? '0'
           : _depositController.text.trim(),
       ownerId: currentUserId,
+      ownerName: currentUserName,
       status: ItemStatus.available,
       createdAt: DateTime.now(),
     );

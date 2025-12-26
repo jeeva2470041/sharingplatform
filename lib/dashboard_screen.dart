@@ -11,19 +11,109 @@ import 'data/mock_data.dart';
 import 'models/item.dart';
 import 'widgets/status_badge.dart';
 import 'widgets/profile_guard.dart';
+import 'widgets/notification_dropdown.dart';
 import 'services/auth_service.dart';
 import 'services/item_service.dart';
 import 'services/transaction_service.dart';
 import 'app_theme.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final String? highlightItemId;
+  final String? highlightSection; // 'lent' or 'borrowed'
+  
+  const DashboardScreen({
+    super.key,
+    this.highlightItemId,
+    this.highlightSection,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final ExpansionTileController _lentTileController = ExpansionTileController();
+  final ExpansionTileController _borrowedTileController = ExpansionTileController();
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _itemKeys = {};
+  String? _highlightItemId;
+
+  @override
+  void initState() {
+    super.initState();
+    _highlightItemId = widget.highlightItemId;
+    
+    // Auto-expand the relevant section and scroll to item after build
+    if (widget.highlightSection != null && widget.highlightItemId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (widget.highlightSection == 'lent') {
+          _lentTileController.expand();
+        } else if (widget.highlightSection == 'borrowed') {
+          _borrowedTileController.expand();
+        }
+        
+        // Wait for expansion animation and data load, then scroll to item
+        Future.delayed(const Duration(milliseconds: 800), () {
+          _scrollToHighlightedItem();
+        });
+        
+        // Clear highlight after 4 seconds (visual effect only, keeps scroll position)
+        Future.delayed(const Duration(seconds: 4), () {
+          if (mounted) {
+            setState(() {
+              _highlightItemId = null;
+            });
+          }
+        });
+      });
+    }
+    
+    // Sync wallet from completed transactions (delayed to not interfere with scroll)
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      TransactionService.syncWalletFromTransactions().then((_) {
+        if (mounted) setState(() {});
+      });
+    });
+  }
+
+  void _scrollToHighlightedItem() {
+    if (_highlightItemId == null) return;
+    
+    final key = _itemKeys[_highlightItemId];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+        alignment: 0.3, // Position item 30% from top
+      );
+    } else {
+      // Retry after a short delay if context not yet available
+      Future.delayed(const Duration(milliseconds: 300), () {
+        final retryKey = _itemKeys[_highlightItemId];
+        if (retryKey?.currentContext != null && mounted) {
+          Scrollable.ensureVisible(
+            retryKey!.currentContext!,
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeInOut,
+            alignment: 0.3,
+          );
+        }
+      });
+    }
+  }
+
+  GlobalKey _getKeyForItem(String itemId) {
+    _itemKeys.putIfAbsent(itemId, () => GlobalKey());
+    return _itemKeys[itemId]!;
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   /// Get the current authenticated user's display name
   String _getUserDisplayName() {
     final user = FirebaseAuth.instance.currentUser;
@@ -49,16 +139,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return MockData.allItems
         .where((item) => item.borrowerId == currentUserId)
         .toList();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    // Sync wallet from completed transactions
-    // This handles the case where lender confirmed return on their browser
-    TransactionService.syncWalletFromTransactions().then((_) {
-      if (mounted) setState(() {});
-    });
   }
 
   @override
@@ -92,18 +172,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.handshake_outlined, color: Colors.white, size: 28),
+                        const Icon(Icons.school, color: Colors.white, size: 24),
                         const SizedBox(width: AppTheme.spacing8),
                         const Text(
-                          'ShareHub',
+                          'Campus Share',
                           style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             color: Colors.white,
-                            fontSize: AppTheme.fontSizeCardHeader,
+                            fontSize: 18,
                             fontWeight: AppTheme.fontWeightBold,
                           ),
                         ),
                         const Spacer(),
+                        // Notification dropdown
+                        const NotificationDropdown(),
+                        const SizedBox(width: AppTheme.spacing8),
                         _buildHeaderButton(
                           icon: Icons.person_outline,
                           label: 'Profile',
@@ -130,9 +213,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppTheme.spacing24,
+                      AppTheme.spacing16,
                       AppTheme.spacing24,
                       AppTheme.spacing24,
-                      AppTheme.spacing32,
                     ),
                     child: Column(
                       children: [
@@ -141,18 +224,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
-                            fontSize: 28,
+                            fontSize: 22,
                             fontWeight: AppTheme.fontWeightBold,
                             color: Colors.white,
                           ),
                         ),
-                        const SizedBox(height: AppTheme.spacing12),
+                        const SizedBox(height: AppTheme.spacing8),
                         Text(
                           'Lend and borrow items securely with QR verification and deposit protection.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
-                            fontSize: AppTheme.fontSizeLabel,
+                            fontSize: 13,
                             color: Colors.white.withOpacity(0.85),
                           ),
                         ),
@@ -166,6 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Main content area
           Expanded(
             child: SingleChildScrollView(
+              controller: _scrollController,
               padding: const EdgeInsets.all(AppTheme.spacing24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,6 +436,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               decoration: AppTheme.cardDecoration,
               child: ExpansionTile(
+                controller: _lentTileController,
                 leading: const Icon(Icons.upload_outlined, color: AppTheme.primary),
                 title: const Text(
                   'Lent Items',
@@ -400,6 +485,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               item: item,
                               isOwner: true,
                               onUpdate: () {},
+                              highlight: _highlightItemId == item.id,
+                              scrollKey: _getKeyForItem(item.id),
                             ),
                           );
                         }).toList(),
@@ -416,6 +503,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               decoration: AppTheme.cardDecoration,
               child: ExpansionTile(
+                controller: _borrowedTileController,
                 leading: const Icon(Icons.download_outlined, color: AppTheme.warning),
                 title: const Text(
                   'Borrowed Items',
@@ -464,6 +552,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               item: item,
                               isBorrowed: true,
                               onUpdate: () {},
+                              highlight: _highlightItemId == item.id,
+                              scrollKey: _getKeyForItem(item.id),
                             ),
                           );
                         }).toList(),
@@ -574,19 +664,60 @@ class _ActivityItemCard extends StatefulWidget {
   final Item item;
   final bool isBorrowed;
   final bool isOwner;
+  final bool highlight;
+  final GlobalKey? scrollKey;
   final VoidCallback onUpdate;
   const _ActivityItemCard({
     required this.item,
     required this.onUpdate,
     this.isBorrowed = false,
     this.isOwner = false,
+    this.highlight = false,
+    this.scrollKey,
   });
 
   @override
   State<_ActivityItemCard> createState() => _ActivityItemCardState();
 }
 
-class _ActivityItemCardState extends State<_ActivityItemCard> {
+class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerProviderStateMixin {
+  late AnimationController _highlightController;
+  late Animation<double> _highlightAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _highlightController = AnimationController(
+      duration: const Duration(milliseconds: 2500),
+      vsync: this,
+    );
+    _highlightAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _highlightController,
+      curve: Curves.easeOut,
+    ));
+    
+    if (widget.highlight) {
+      _highlightController.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(_ActivityItemCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.highlight && !oldWidget.highlight) {
+      _highlightController.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _highlightController.dispose();
+    super.dispose();
+  }
+
   IconData _categoryIcon(String category) {
     switch (category) {
       case 'Calculator':
@@ -684,6 +815,115 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
     }
   }
 
+  /// Delete an item (soft delete with confirmation)
+  Future<void> _deleteItem() async {
+    // First check if deletion is allowed
+    final canDelete = await ItemService.canDeleteItem(widget.item.id);
+    if (!canDelete) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot delete: Item has active transactions or is not available'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+      return;
+    }
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.delete_forever, color: AppTheme.danger, size: 28),
+            const SizedBox(width: 12),
+            const Text('Delete Item?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to delete "${widget.item.name}"?',
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.warning.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppTheme.warning, size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'This item will be removed from the marketplace.',
+                      style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Re-check before deletion (handles race condition)
+    final stillCanDelete = await ItemService.canDeleteItem(widget.item.id);
+    if (!stillCanDelete) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot delete: Someone just requested this item!'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await ItemService.softDeleteItem(widget.item.id);
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Item deleted successfully'),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+      widget.onUpdate();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete: $e'), backgroundColor: AppTheme.danger),
+      );
+    }
+  }
+
   void _openChat() {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
     final otherUserId = widget.isOwner
@@ -697,12 +937,18 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
       return;
     }
 
+    // Determine the other user's name based on role
+    final otherUserName = widget.isOwner 
+        ? 'Borrower' // When owner, other user is borrower
+        : (widget.item.ownerName ?? 'Lender'); // When borrower, other user is owner
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
           itemId: widget.item.id,
           otherUserId: otherUserId,
+          otherUserName: otherUserName,
           itemName: widget.item.name,
         ),
       ),
@@ -930,61 +1176,95 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
         (widget.item.status == ItemStatus.requested ||
         widget.item.status == ItemStatus.approved ||
         widget.item.status == ItemStatus.active);
+    // Show delete button only for owner when item is available (no active transactions)
+    final bool showDeleteButton =
+        widget.isOwner && widget.item.status == ItemStatus.available;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: AppTheme.spacing12),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        border: isActive
-            ? Border.all(color: AppTheme.primary.withOpacity(0.4), width: 2)
-            : isApproved
-            ? Border.all(color: AppTheme.success.withOpacity(0.3), width: 1)
-            : Border.all(color: AppTheme.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            offset: const Offset(0, 2),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.spacing16),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: isApproved
-                        ? AppTheme.success.withOpacity(0.1)
-                        : AppTheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+      key: widget.scrollKey,
+      child: AnimatedBuilder(
+        animation: _highlightAnimation,
+        builder: (context, child) {
+          final glowIntensity = _highlightAnimation.value;
+          final isGlowing = widget.highlight && glowIntensity > 0;
+          
+          return Container(
+            margin: const EdgeInsets.only(bottom: AppTheme.spacing12),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBackground,
+              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+              border: isGlowing
+                  ? Border.all(
+                      color: Colors.lightBlueAccent.withOpacity(0.8 + (glowIntensity * 0.2)),
+                      width: 2.5 + (glowIntensity * 1.5),
+                    )
+                  : isActive
+                      ? Border.all(color: AppTheme.primary.withOpacity(0.4), width: 2)
+                      : isApproved
+                          ? Border.all(color: AppTheme.success.withOpacity(0.3), width: 1)
+                          : Border.all(color: AppTheme.border),
+              boxShadow: isGlowing
+                  ? [
+                      // Inner glow - bright blue
+                      BoxShadow(
+                        color: Colors.lightBlueAccent.withOpacity(glowIntensity * 0.7),
+                        blurRadius: 12 + (glowIntensity * 16),
+                        spreadRadius: glowIntensity * 3,
+                      ),
+                      // Outer lightning glow - electric blue
+                      BoxShadow(
+                        color: Colors.cyanAccent.withOpacity(glowIntensity * 0.5),
+                        blurRadius: 20 + (glowIntensity * 12),
+                        spreadRadius: glowIntensity * 6,
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        offset: const Offset(0, 2),
+                        blurRadius: 8,
+                      ),
+                    ],
+            ),
+            child: child,
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.spacing16),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: isApproved
+                          ? AppTheme.success.withOpacity(0.1)
+                          : AppTheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                    ),
+                    child: Icon(
+                      _categoryIcon(widget.item.category),
+                      color: isApproved ? AppTheme.success : AppTheme.primary,
+                    ),
                   ),
-                  child: Icon(
-                    _categoryIcon(widget.item.category),
-                    color: isApproved ? AppTheme.success : AppTheme.primary,
-                  ),
-                ),
-                const SizedBox(width: AppTheme.spacing12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.item.name,
-                              style: AppTheme.sectionTitle,
+                  const SizedBox(width: AppTheme.spacing12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.item.name,
+                                style: AppTheme.sectionTitle,
+                              ),
                             ),
-                          ),
-                          if (canChat)
+                            if (canChat)
                             IconButton(
                               icon: const Icon(Icons.chat_bubble_outline),
                               color: AppTheme.primary,
@@ -993,6 +1273,19 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
                               padding: EdgeInsets.zero,
                               iconSize: 20,
                             ),
+                            if (showDeleteButton) ...
+                            [
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                color: AppTheme.danger,
+                                onPressed: _deleteItem,
+                                constraints: const BoxConstraints(),
+                                padding: EdgeInsets.zero,
+                                iconSize: 20,
+                                tooltip: 'Delete item',
+                              ),
+                            ],
                         ],
                       ),
                       const SizedBox(height: AppTheme.spacing4),
@@ -1241,6 +1534,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> {
           ],
         ),
       ),
+    ),
     );
   }
 }

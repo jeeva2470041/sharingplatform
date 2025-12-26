@@ -105,15 +105,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      // Store context reference before async gap
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      final navigator = Navigator.of(context);
+
+      scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('Profile saved successfully!'),
           backgroundColor: Colors.green,
         ),
       );
 
-      Navigator.pop(context, true);
+      navigator.pop(true);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isSaving = false;
