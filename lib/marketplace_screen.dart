@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
 import 'widgets/status_badge.dart';
 import 'widgets/rating_dialog.dart';
 import 'chat_screen.dart';
+import 'services/item_service.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
@@ -16,11 +18,11 @@ class MarketplaceScreen extends StatefulWidget {
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
   String _searchQuery = '';
 
-  List<Item> get _filteredItems {
+  List<Item> _filterItems(List<Item> items) {
     if (_searchQuery.isEmpty) {
-      return MockData.marketplaceItems;
+      return items;
     }
-    return MockData.marketplaceItems
+    return items
         .where(
           (item) =>
               item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -32,11 +34,21 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Marketplace')),
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: const Text(
+          'Find Items',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+      ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12.0),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: TextField(
               onChanged: (value) {
                 setState(() {
@@ -44,38 +56,83 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 });
               },
               decoration: InputDecoration(
-                hintText: 'Search items by name or category...',
-                prefixIcon: const Icon(Icons.search),
+                hintText: 'Search items...',
+                hintStyle: TextStyle(color: Colors.grey.shade400),
+                prefixIcon: const Icon(Icons.search, color: Colors.teal),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Colors.grey.shade50,
+                fillColor: Colors.teal.shade50.withOpacity(0.5),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
               ),
             ),
           ),
           Expanded(
-            child: _filteredItems.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Text(
-                        'No items available',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
+            child: StreamBuilder<List<Item>>(
+              stream: ItemService.marketplaceItemsStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Error: ${snapshot.error}'),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final items = _filterItems(snapshot.data ?? []);
+
+                if (items.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No items found',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try searching for something else\nor post a request',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade400),
+                        ),
+                      ],
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: _filteredItems.length,
-                    itemBuilder: (context, index) {
-                      final item = _filteredItems[index];
-                      return ItemCard(
-                        item: item,
-                        onUpdate: () => setState(() {}),
-                      );
-                    },
-                  ),
+                  );
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: items.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return ItemCard(
+                      item: item,
+                      onUpdate: () {}, // No longer needed with StreamBuilder
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -108,7 +165,7 @@ class _ItemCardState extends State<ItemCard> {
   void _requestItem() {
     // Check if user is trying to borrow their own item
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
-    
+
     if (widget.item.ownerId == currentUserId) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -170,7 +227,7 @@ class _ItemCardState extends State<ItemCard> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        'Deposit Required: \$${widget.item.deposit}',
+                        'Deposit Required: ₹${widget.item.deposit}',
                         style: TextStyle(
                           color: Colors.orange.shade800,
                           fontWeight: FontWeight.bold,
@@ -211,11 +268,11 @@ class _ItemCardState extends State<ItemCard> {
 
   Future<void> _processRequest() async {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
-    
+
     // Get borrower's wallet (current user)
     final borrowerWallet = MockData.getWalletForUser(currentUserId);
     final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
-    
+
     // Check if borrower has enough balance
     if (depositAmount > 0 && borrowerWallet.balance < depositAmount) {
       if (!mounted) return;
@@ -228,68 +285,68 @@ class _ItemCardState extends State<ItemCard> {
       return;
     }
 
-    setState(() {
-      widget.item.status = ItemStatus.requested;
-      widget.item.borrowerId = currentUserId; // Set borrower to current user
-    });
+    try {
+      // Update item in Firestore
+      await ItemService.requestItem(widget.item.id);
 
-    // Lock deposit in borrower's wallet (deduct from balance, add to lockedDeposit)
-    if (depositAmount > 0) {
-      borrowerWallet.lockDeposit(depositAmount);
-      await MockData.saveWallet();
-    }
+      // Lock deposit in borrower's wallet (deduct from balance, add to lockedDeposit)
+      if (depositAmount > 0) {
+        borrowerWallet.lockDeposit(depositAmount);
+        await MockData.saveWallet();
+      }
 
-    await MockData.saveItems();
+      if (!mounted) return;
 
-    // Update parent widget
-    widget.onUpdate();
-
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle, color: Colors.teal, size: 56),
-            const SizedBox(height: 16),
-            const Text(
-              'Request Sent Successfully',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Lender will review your request',
-              style: TextStyle(color: Colors.black54),
-              textAlign: TextAlign.center,
-            ),
-            if (depositAmount > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Deposit of \$$depositAmount locked',
-                style: const TextStyle(
-                  color: Colors.orange,
-                  fontWeight: FontWeight.w500,
-                ),
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle, color: Colors.teal, size: 56),
+              const SizedBox(height: 16),
+              const Text(
+                'Request Sent Successfully',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+              const SizedBox(height: 8),
+              const Text(
+                'Lender will review your request',
+                style: TextStyle(color: Colors.black54),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              if (depositAmount > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Deposit of ₹$depositAmount locked',
+                  style: const TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to request item: $e')),
+      );
+    }
   }
 
   void _returnItem() {
@@ -298,43 +355,49 @@ class _ItemCardState extends State<ItemCard> {
       builder: (context) => RatingDialog(
         itemName: widget.item.name,
         onRatingSubmitted: (rating) async {
-          final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+          final currentUserId =
+              FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
           final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
-          
-          setState(() {
-            widget.item.status = ItemStatus.returned;
-            widget.item.rating =
+
+          try {
+            // Calculate new rating
+            final newRating =
                 ((widget.item.rating ?? 0) * (widget.item.ratingCount ?? 0) +
                     rating) /
                 ((widget.item.ratingCount ?? 0) + 1);
-            widget.item.ratingCount = (widget.item.ratingCount ?? 0) + 1;
-          });
+            final newRatingCount = (widget.item.ratingCount ?? 0) + 1;
 
-          // Release deposit back to borrower (current user)
-          if (depositAmount > 0) {
-            final borrowerWallet = MockData.getWalletForUser(currentUserId);
-            borrowerWallet.releaseDeposit(depositAmount);
-            await MockData.saveWallet();
+            // Update item in Firestore
+            await ItemService.returnItem(
+              widget.item.id,
+              newRating: newRating,
+              newRatingCount: newRatingCount,
+            );
+
+            // Release deposit back to borrower (current user)
+            if (depositAmount > 0) {
+              final borrowerWallet = MockData.getWalletForUser(currentUserId);
+              borrowerWallet.releaseDeposit(depositAmount);
+              await MockData.saveWallet();
+            }
+          } catch (e) {
+            debugPrint('Failed to return item: $e');
           }
-          
-          // Reset item for next borrower
-          widget.item.borrowerId = null;
-          widget.item.status = ItemStatus.available;
-          await MockData.saveItems();
-
-          // Update parent widget
-          widget.onUpdate();
         },
       ),
     );
   }
 
   void _openChat() {
+    // In marketplace, current user is borrower, other user is the owner/lender
+    // Chat is ITEM-SPECIFIC - each item has its own chat
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          itemId: widget.item.id,
+          itemId: widget.item.id, // CRITICAL: Item-specific chat
+          otherUserId: widget.item.ownerId,
+          itemName: widget.item.name,
         ),
       ),
     );
@@ -352,126 +415,232 @@ class _ItemCardState extends State<ItemCard> {
         (widget.item.status == ItemStatus.requested ||
             widget.item.status == ItemStatus.approved);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
           children: [
-            CircleAvatar(
-              radius: 26,
-              backgroundColor: Colors.teal.shade50,
-              child: Icon(
-                _categoryIcon(widget.item.category),
-                color: Colors.teal,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.item.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.item.category,
-                    style: const TextStyle(color: Colors.black54),
+                  child: Icon(
+                    _categoryIcon(widget.item.category),
+                    color: Colors.teal,
+                    size: 28,
                   ),
-                  const SizedBox(height: 6),
-                  Row(
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Deposit: \$${widget.item.deposit}',
-                        style: const TextStyle(color: Colors.black87),
-                      ),
-                      if (widget.item.rating != null &&
-                          widget.item.rating! > 0) ...[
-                        const SizedBox(width: 12),
-                        Icon(
-                          Icons.star,
-                          size: 16,
-                          color: Colors.amber.shade700,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          widget.item.rating!.toStringAsFixed(1),
-                          style: TextStyle(
-                            color: Colors.amber.shade900,
-                            fontWeight: FontWeight.w600,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.item.name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
+                          StatusBadge(status: widget.item.status),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.item.category,
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 13,
                         ),
-                      ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.shield_outlined,
+                                  size: 14,
+                                  color: Colors.orange.shade800,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Deposit: ₹${widget.item.deposit}',
+                                  style: TextStyle(
+                                    color: Colors.orange.shade800,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (widget.item.rating != null &&
+                              widget.item.rating! > 0) ...[
+                            const SizedBox(width: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.star_rounded,
+                                  size: 16,
+                                  color: Colors.amber.shade700,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  widget.item.rating!.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    color: Colors.amber.shade900,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (canChat)
-                      IconButton(
-                        icon: const Icon(Icons.chat_bubble_outline),
-                        color: Colors.blue,
-                        onPressed: _openChat,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    const SizedBox(width: 8),
-                    StatusBadge(status: widget.item.status),
-                  ],
                 ),
-                if (canRequest || canReturn) ...[
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: canRequest ? _requestItem : _returnItem,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(100, 36),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: Icon(
-                      canRequest
-                          ? Icons.add_shopping_cart
-                          : Icons.assignment_return,
-                      size: 18,
-                    ),
-                    label: Text(canRequest ? 'Request' : 'Return'),
-                  ),
-                ] else if (widget.item.status == ItemStatus.requested ||
-                    widget.item.status == ItemStatus.approved) ...[
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: null,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(100, 36),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      disabledBackgroundColor: Colors.grey.shade200,
-                      disabledForegroundColor: Colors.grey.shade500,
-                    ),
-                    icon: const Icon(Icons.lock_clock, size: 18),
-                    label: Text(
-                      widget.item.status == ItemStatus.requested
-                          ? 'Requested'
-                          : 'Approved',
-                    ),
-                  ),
-                ],
               ],
             ),
+            if (canRequest ||
+                canReturn ||
+                canChat ||
+                widget.item.status == ItemStatus.requested ||
+                widget.item.status == ItemStatus.approved) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (canChat)
+                    TextButton.icon(
+                      icon: const Icon(Icons.chat_bubble_outline, size: 20),
+                      label: const Text('Chat'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade600,
+                      ),
+                      onPressed: _openChat,
+                    )
+                  else
+                    const Spacer(),
+
+                  if (canRequest || canReturn)
+                    ElevatedButton(
+                      onPressed: canRequest ? _requestItem : _returnItem,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: canRequest ? Colors.teal : Colors.blue,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 0,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        canRequest ? 'Request Item' : 'Return Item',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    )
+                  else if (widget.item.status == ItemStatus.requested)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.access_time_filled,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Request Pending',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (widget.item.status == ItemStatus.approved)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            size: 16,
+                            color: Colors.green,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Approved',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

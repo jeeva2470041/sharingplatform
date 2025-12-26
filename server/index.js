@@ -24,27 +24,29 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   socket.on('joinRoom', (itemId) => {
-    socket.join(itemId);
-    console.log(`User ${socket.id} joined room: ${itemId}`);
+    const room = String(itemId);
+    socket.join(room);
+    console.log(`User ${socket.id} joined room: ${room}`);
 
     // Send previous messages if they exist
-    if (chatHistory[itemId]) {
-      socket.emit('previousMessages', chatHistory[itemId]);
+    if (chatHistory[room]) {
+      socket.emit('previousMessages', chatHistory[room]);
     }
   });
 
   socket.on('sendMessage', (data) => {
     // data should contain: { itemId, senderId, text, timestamp }
     console.log('Message received:', data);
+    const room = String(data.itemId);
 
     // Store the new message
-    if (!chatHistory[data.itemId]) {
-      chatHistory[data.itemId] = [];
+    if (!chatHistory[room]) {
+      chatHistory[room] = [];
     }
-    chatHistory[data.itemId].push(data);
-    
+    chatHistory[room].push(data);
+
     // Broadcast to everyone in the room (including sender)
-    io.to(data.itemId).emit('receiveMessage', data);
+    io.to(room).emit('receiveMessage', data);
   });
 
   socket.on('disconnect', () => {

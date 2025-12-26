@@ -72,10 +72,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } else {
       // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(error), backgroundColor: Colors.red),
       );
     }
 
@@ -94,121 +91,126 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Account')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                onChanged: () => setState(() {}),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Name',
-                        prefixIcon: Icon(Icons.person_outline),
-                      ),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? 'Enter your name' : null,
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Form(
+              key: _formKey,
+              onChanged: () => setState(() {}),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Create Account',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal,
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Join the community and start sharing!',
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+
+                  _buildTextField(
+                    controller: _nameController,
+                    label: 'Full Name',
+                    icon: Icons.person_outline,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Enter your name' : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildTextField(
+                    controller: _emailController,
+                    label: 'Email Address',
+                    icon: Icons.email_outlined,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Enter your email' : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildTextField(
+                    controller: _passwordController,
+                    label: 'Password',
+                    icon: Icons.lock_outline,
+                    isPassword: true,
+                    isVisible: _isPasswordVisible,
+                    onVisibilityChanged: () => setState(
+                      () => _isPasswordVisible = !_isPasswordVisible,
+                    ),
+                    onChanged: _updatePasswordValidation,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Password required';
+                      if (!_isPasswordValid)
+                        return 'Password does not meet requirements';
+                      return null;
+                    },
+                  ),
+
+                  if (_passwordController.text.isNotEmpty) ...[
                     const SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
-                      ),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? 'Enter your email' : null,
-                    ),
-                    const SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: !_isPasswordVisible,
-                      onChanged: _updatePasswordValidation,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPasswordVisible
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
-                        ),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return 'Password required';
-                        }
-                        if (!_isPasswordValid) {
-                          return 'Password does not meet requirements';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 8),
                     _buildPasswordRules(),
-                    const SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      obscureText: !_isConfirmPasswordVisible,
-                      decoration: InputDecoration(
-                        labelText: 'Confirm Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isConfirmPasswordVisible
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isConfirmPasswordVisible =
-                                  !_isConfirmPasswordVisible;
-                            });
-                          },
-                        ),
-                      ),
-                      validator: (v) =>
-                          v != _passwordController.text
-                              ? 'Passwords do not match'
-                              : null,
-                    ),
-                    const SizedBox(height: 24),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _isFormValid && !_isLoading
-                            ? _register
-                            : null,
-                        child: _isLoading
-                            ? const CircularProgressIndicator()
-                            : const Text('Register'),
-                      ),
-                    ),
                   ],
-                ),
+
+                  const SizedBox(height: 16),
+
+                  _buildTextField(
+                    controller: _confirmPasswordController,
+                    label: 'Confirm Password',
+                    icon: Icons.lock_outline,
+                    isPassword: true,
+                    isVisible: _isConfirmPasswordVisible,
+                    onVisibilityChanged: () => setState(
+                      () => _isConfirmPasswordVisible =
+                          !_isConfirmPasswordVisible,
+                    ),
+                    validator: (v) => v != _passwordController.text
+                        ? 'Passwords do not match'
+                        : null,
+                  ),
+                  const SizedBox(height: 32),
+
+                  SizedBox(
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isFormValid && !_isLoading ? _register : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        disabledBackgroundColor: Colors.teal.shade100,
+                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              'Register',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -217,41 +219,115 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildPasswordRules() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Password must contain:',
-          style: TextStyle(fontSize: 12),
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+    bool isVisible = false,
+    VoidCallback? onVisibilityChanged,
+    String? Function(String?)? validator,
+    void Function(String)? onChanged,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: isPassword && !isVisible,
+      onChanged: onChanged,
+      validator: validator,
+      style: const TextStyle(fontSize: 16),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: Colors.teal),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  isVisible ? Icons.visibility : Icons.visibility_off,
+                  color: Colors.grey,
+                ),
+                onPressed: onVisibilityChanged,
+              )
+            : null,
+        filled: true,
+        fillColor: Colors.teal.shade50.withOpacity(0.3),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
         ),
-        const SizedBox(height: 4),
-        _rule('At least 1 uppercase letter', _hasUppercase),
-        _rule('At least 1 lowercase letter', _hasLowercase),
-        _rule('At least 1 number', _hasDigit),
-        _rule('At least 1 special character (@\$!%*?&)', _hasSpecialChar),
-        _rule('At least 6 characters', _hasValidLength),
-      ],
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.teal, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 1),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 16,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordRules() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Password Requirements:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _rule('Uppercase letter', _hasUppercase),
+          _rule('Lowercase letter', _hasLowercase),
+          _rule('Number', _hasDigit),
+          _rule('Special character (@\$!%*?&)', _hasSpecialChar),
+          _rule('6+ characters', _hasValidLength),
+        ],
+      ),
     );
   }
 
   Widget _rule(String text, bool valid) {
-    return Row(
-      children: [
-        Icon(
-          valid ? Icons.check_circle : Icons.cancel,
-          color: valid ? Colors.green : Colors.red,
-          size: 14,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            color: valid ? Colors.green : Colors.red,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        children: [
+          Icon(
+            valid ? Icons.check_circle : Icons.circle_outlined,
+            color: valid ? Colors.teal : Colors.grey,
+            size: 16,
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: valid ? Colors.black87 : Colors.grey,
+              decoration: valid ? null : null,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

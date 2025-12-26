@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum ItemStatus { available, requested, approved, returned, settled }
 
 class Item {
@@ -10,6 +12,7 @@ class Item {
   String? borrowerId; // User who borrowed/requested the item (BORROWER)
   double? rating;
   int? ratingCount;
+  final DateTime? createdAt;
 
   Item({
     required this.id,
@@ -21,6 +24,7 @@ class Item {
     this.borrowerId,
     this.rating,
     this.ratingCount,
+    this.createdAt,
   });
 
   String get statusText {
@@ -38,6 +42,7 @@ class Item {
     }
   }
 
+  /// Convert to JSON for local storage (legacy support)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -49,9 +54,32 @@ class Item {
       'borrowerId': borrowerId,
       'rating': rating,
       'ratingCount': ratingCount,
+      'createdAt': createdAt?.toIso8601String(),
     };
   }
 
+  /// Convert to Firestore document
+  /// Uses local DateTime for instant UI updates (no serverTimestamp delay)
+  Map<String, dynamic> toFirestore() {
+    return {
+      'id': id,
+      'name': name,
+      'category': category,
+      'deposit': deposit,
+      'ownerId': ownerId,
+      'status': status.index,
+      'borrowerId': borrowerId,
+      'rating': rating,
+      'ratingCount': ratingCount,
+      // Use Timestamp.fromDate for consistent Firestore storage
+      // Local DateTime ensures instant UI updates without serverTimestamp delay
+      'createdAt': createdAt != null 
+          ? Timestamp.fromDate(createdAt!) 
+          : Timestamp.now(),
+    };
+  }
+
+  /// Create from JSON (legacy support)
   factory Item.fromJson(Map<String, dynamic> json) {
     return Item(
       id: json['id'],
@@ -59,10 +87,70 @@ class Item {
       category: json['category'],
       deposit: json['deposit'],
       ownerId: json['ownerId'],
-      status: ItemStatus.values[json['status']],
+      status: ItemStatus.values[json['status'] ?? 0],
       borrowerId: json['borrowerId'],
       rating: json['rating']?.toDouble(),
       ratingCount: json['ratingCount'],
+      createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt']) 
+          : null,
+    );
+  }
+
+  /// Create from Firestore document
+  /// Handles pending writes where timestamp may be null
+  factory Item.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    
+    // Handle createdAt - may be null for pending writes
+    DateTime? createdAt;
+    if (data['createdAt'] != null) {
+      final timestamp = data['createdAt'];
+      if (timestamp is Timestamp) {
+        createdAt = timestamp.toDate();
+      }
+    }
+    // Fallback to current time for documents with pending writes
+    createdAt ??= DateTime.now();
+    
+    return Item(
+      id: doc.id,
+      name: data['name'] ?? '',
+      category: data['category'] ?? '',
+      deposit: data['deposit'] ?? '0',
+      ownerId: data['ownerId'] ?? '',
+      status: ItemStatus.values[data['status'] ?? 0],
+      borrowerId: data['borrowerId'],
+      rating: data['rating']?.toDouble(),
+      ratingCount: data['ratingCount'],
+      createdAt: createdAt,
+    );
+  }
+
+  /// Create a copy with updated fields
+  Item copyWith({
+    String? id,
+    String? name,
+    String? category,
+    String? deposit,
+    String? ownerId,
+    ItemStatus? status,
+    String? borrowerId,
+    double? rating,
+    int? ratingCount,
+    DateTime? createdAt,
+  }) {
+    return Item(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      deposit: deposit ?? this.deposit,
+      ownerId: ownerId ?? this.ownerId,
+      status: status ?? this.status,
+      borrowerId: borrowerId ?? this.borrowerId,
+      rating: rating ?? this.rating,
+      ratingCount: ratingCount ?? this.ratingCount,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }
