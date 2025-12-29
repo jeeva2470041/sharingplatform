@@ -1,11 +1,11 @@
 {
-    "name": "sharingplatform",
-    "short_name": "sharingplatform",
+    "name": "Campus Share",
+    "short_name": "Campus Share",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#6C63FF",
+    "theme_color": "#6C63FF",
+    "description": "Lend and borrow items securely with QR verification.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
