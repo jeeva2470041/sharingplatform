@@ -1,5 +1,5 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'data/mock_data.dart';
 import 'services/transaction_service.dart';
 import 'models/transaction.dart';
@@ -562,16 +562,20 @@ class _ReturnQrScreenState extends State<ReturnQrScreen> {
 
           // QR Code visual
           Container(
-            width: 200,
-            height: 200,
+            width: 220,
+            height: 220,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.grey.shade300, width: 2),
             ),
-            child: CustomPaint(
-              painter: _QrCodePainter(_returnQrCode!),
-              size: const Size(200, 200),
+            child: QrImageView(
+              data: _returnQrCode!,
+              version: QrVersions.auto,
+              size: 200,
+              backgroundColor: Colors.white,
+              errorCorrectionLevel: QrErrorCorrectLevel.M,
             ),
           ),
           const SizedBox(height: 16),
@@ -737,76 +741,4 @@ class _ReturnQrScreenState extends State<ReturnQrScreen> {
       ),
     );
   }
-}
-
-/// Custom painter for QR visualization
-class _QrCodePainter extends CustomPainter {
-  final String code;
-
-  _QrCodePainter(this.code);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.indigo.shade800
-      ..style = PaintingStyle.fill;
-
-    final random = Random(code.hashCode);
-    final cellSize = size.width / 21;
-
-    // Draw corner patterns
-    _drawCornerPattern(canvas, paint, 0, 0, cellSize);
-    _drawCornerPattern(canvas, paint, size.width - 7 * cellSize, 0, cellSize);
-    _drawCornerPattern(canvas, paint, 0, size.height - 7 * cellSize, cellSize);
-
-    // Draw data pattern
-    for (int i = 8; i < 13; i++) {
-      for (int j = 0; j < 21; j++) {
-        if (random.nextBool()) {
-          canvas.drawRect(
-            Rect.fromLTWH(i * cellSize, j * cellSize, cellSize, cellSize),
-            paint,
-          );
-        }
-      }
-    }
-    for (int i = 0; i < 21; i++) {
-      for (int j = 8; j < 13; j++) {
-        if (j < 13 && i < 13) continue;
-        if (random.nextBool()) {
-          canvas.drawRect(
-            Rect.fromLTWH(i * cellSize, j * cellSize, cellSize, cellSize),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  void _drawCornerPattern(
-    Canvas canvas,
-    Paint paint,
-    double x,
-    double y,
-    double cellSize,
-  ) {
-    canvas.drawRect(Rect.fromLTWH(x, y, 7 * cellSize, 7 * cellSize), paint);
-    final whitePaint = Paint()..color = Colors.white;
-    canvas.drawRect(
-      Rect.fromLTWH(x + cellSize, y + cellSize, 5 * cellSize, 5 * cellSize),
-      whitePaint,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(
-        x + 2 * cellSize,
-        y + 2 * cellSize,
-        3 * cellSize,
-        3 * cellSize,
-      ),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
