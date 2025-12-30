@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
 import 'services/item_service.dart';
@@ -17,6 +19,8 @@ class _PostItemScreenState extends State<PostItemScreen> {
   final _depositController = TextEditingController();
   String _selectedCategory = MockData.categories.first;
   bool _isSubmitting = false; // Prevent double submission
+  final List<Uint8List> _selectedImages = [];
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -66,6 +70,92 @@ class _PostItemScreenState extends State<PostItemScreen> {
     }
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        if (_selectedImages.length < 3) {
+          setState(() {
+            _selectedImages.add(bytes);
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick image: $e')),
+        );
+      }
+    }
+  }
+
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Add Photo',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.camera_alt, color: AppTheme.primary),
+                ),
+                title: const Text('Take Photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_library, color: AppTheme.primary),
+                ),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
+  }
+
   Future<void> _submit() async {
     // Prevent double submission
     if (_isSubmitting) return;
@@ -85,21 +175,30 @@ class _PostItemScreenState extends State<PostItemScreen> {
     final currentUserId = user?.uid ?? 'unknown';
     final currentUserName = user?.displayName ?? user?.email?.split('@').first ?? 'Anonymous';
 
-    // Add new item to Firestore (shared across all users)
-    final newItem = Item(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameController.text.trim(),
-      category: _selectedCategory,
-      deposit: _depositController.text.isEmpty
-          ? '0'
-          : _depositController.text.trim(),
-      ownerId: currentUserId,
-      ownerName: currentUserName,
-      status: ItemStatus.available,
-      createdAt: DateTime.now(),
-    );
+    final itemId = DateTime.now().millisecondsSinceEpoch.toString();
 
     try {
+      // Upload images first if any
+      List<String> imageUrls = [];
+      if (_selectedImages.isNotEmpty) {
+        imageUrls = await ItemService.uploadItemImages(_selectedImages, itemId);
+      }
+
+      // Add new item to Firestore (shared across all users)
+      final newItem = Item(
+        id: itemId,
+        name: _nameController.text.trim(),
+        category: _selectedCategory,
+        deposit: _depositController.text.isEmpty
+            ? '0'
+            : _depositController.text.trim(),
+        ownerId: currentUserId,
+        ownerName: currentUserName,
+        status: ItemStatus.available,
+        createdAt: DateTime.now(),
+        imageUrls: imageUrls,
+      );
+
       await ItemService.addItem(newItem);
 
       if (!mounted) return;
@@ -300,6 +399,116 @@ class _PostItemScreenState extends State<PostItemScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Image picker section
+                    _buildSectionHeader('Photos (Optional)'),
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 0,
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Add up to 3 photos of your item',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 100,
+                              child: ListView(
+                                scrollDirection: Axis.horizontal,
+                                children: [
+                                  // Existing images
+                                  ..._selectedImages.asMap().entries.map((entry) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 12),
+                                      child: Stack(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(12),
+                                            child: Image.memory(
+                                              entry.value,
+                                              width: 100,
+                                              height: 100,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                          Positioned(
+                                            top: 4,
+                                            right: 4,
+                                            child: GestureDetector(
+                                              onTap: () => _removeImage(entry.key),
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.red,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.close,
+                                                  size: 16,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                  // Add button
+                                  if (_selectedImages.length < 3)
+                                    GestureDetector(
+                                      onTap: _showImageSourceDialog,
+                                      child: Container(
+                                        width: 100,
+                                        height: 100,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade100,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: Colors.grey.shade300,
+                                            style: BorderStyle.solid,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.add_a_photo,
+                                              color: AppTheme.primary,
+                                              size: 28,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Add Photo',
+                                              style: TextStyle(
+                                                color: AppTheme.primary,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                           ],

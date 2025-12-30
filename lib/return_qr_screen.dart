@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'data/mock_data.dart';
 import 'services/transaction_service.dart';
+import 'services/rating_service.dart';
 import 'models/transaction.dart';
 import 'app_theme.dart';
 import 'widgets/qr_scanner_dialog.dart';
+import 'widgets/rating_dialog.dart';
 
 /// Screen for QR-based return verification
 /// Borrower generates Return QR, Lender scans to confirm item return
@@ -238,6 +240,12 @@ class _ReturnQrScreenState extends State<ReturnQrScreen> {
         ),
       );
 
+      // Show rating dialog after successful return (lender rates borrower)
+      if (_transaction != null) {
+        await _showRatingDialog();
+      }
+
+      if (!mounted) return;
       Navigator.pop(context, true); // Return success
     } catch (e) {
       setState(() {
@@ -253,6 +261,37 @@ class _ReturnQrScreenState extends State<ReturnQrScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _showRatingDialog() async {
+    if (_transaction == null) return;
+    
+    // Lender rates borrower
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => RatingDialog(
+        itemName: _transaction!.itemName,
+        transactionId: _transaction!.id,
+        ratedUserId: _transaction!.borrowerId,
+        ratedUserName: 'the borrower',
+        isRatingLender: false, // Lender is rating borrower
+        onRatingSubmitted: (rating, comment) async {
+          try {
+            await RatingService.submitRating(
+              transactionId: _transaction!.id,
+              ratedUserId: _transaction!.borrowerId,
+              rating: rating.toDouble(),
+              comment: comment,
+              itemName: _transaction!.itemName,
+              ratedAsLender: false, // The rated user (borrower) was NOT the lender
+            );
+          } catch (e) {
+            debugPrint('Failed to submit rating: $e');
+          }
+        },
+      ),
+    );
   }
 
   @override

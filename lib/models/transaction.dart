@@ -9,6 +9,52 @@ enum TransactionStatus {
   cancelled, // Request was rejected or cancelled
 }
 
+/// Borrow duration options
+enum BorrowDuration {
+  oneDay,
+  threeDays,
+  oneWeek,
+  twoWeeks,
+  oneMonth,
+  custom,
+}
+
+extension BorrowDurationExtension on BorrowDuration {
+  String get label {
+    switch (this) {
+      case BorrowDuration.oneDay:
+        return '1 Day';
+      case BorrowDuration.threeDays:
+        return '3 Days';
+      case BorrowDuration.oneWeek:
+        return '1 Week';
+      case BorrowDuration.twoWeeks:
+        return '2 Weeks';
+      case BorrowDuration.oneMonth:
+        return '1 Month';
+      case BorrowDuration.custom:
+        return 'Custom';
+    }
+  }
+
+  int get days {
+    switch (this) {
+      case BorrowDuration.oneDay:
+        return 1;
+      case BorrowDuration.threeDays:
+        return 3;
+      case BorrowDuration.oneWeek:
+        return 7;
+      case BorrowDuration.twoWeeks:
+        return 14;
+      case BorrowDuration.oneMonth:
+        return 30;
+      case BorrowDuration.custom:
+        return 0; // Custom will be set separately
+    }
+  }
+}
+
 /// Transaction model for tracking the lending lifecycle
 /// Credits are only deducted after QR verification
 class LendingTransaction {
@@ -25,6 +71,8 @@ class LendingTransaction {
   final DateTime? handoverAt; // When handover QR was scanned
   final DateTime? completedAt; // When returned/settled
   final String? completionType; // 'returned' or 'kept'
+  final int? borrowDurationDays; // How many days to borrow
+  final DateTime? dueDate; // When the item should be returned
 
   LendingTransaction({
     required this.id,
@@ -40,6 +88,8 @@ class LendingTransaction {
     this.handoverAt,
     this.completedAt,
     this.completionType,
+    this.borrowDurationDays,
+    this.dueDate,
   });
 
   /// Generate a unique QR code for handover
@@ -63,6 +113,28 @@ class LendingTransaction {
   /// Check if transaction is already completed
   bool get isCompleted => status == TransactionStatus.completed;
 
+  /// Check if item is overdue
+  bool get isOverdue {
+    if (status != TransactionStatus.active || dueDate == null) return false;
+    return DateTime.now().isAfter(dueDate!);
+  }
+
+  /// Get days until due (negative if overdue)
+  int get daysUntilDue {
+    if (dueDate == null) return 0;
+    return dueDate!.difference(DateTime.now()).inDays;
+  }
+
+  /// Get due status text
+  String get dueStatusText {
+    if (dueDate == null) return 'No due date';
+    final days = daysUntilDue;
+    if (days < 0) return 'Overdue by ${-days} day${-days == 1 ? '' : 's'}';
+    if (days == 0) return 'Due today';
+    if (days == 1) return 'Due tomorrow';
+    return 'Due in $days days';
+  }
+
   Map<String, dynamic> toFirestore() {
     return {
       'id': id,
@@ -80,6 +152,8 @@ class LendingTransaction {
           ? Timestamp.fromDate(completedAt!)
           : null,
       'completionType': completionType,
+      'borrowDurationDays': borrowDurationDays,
+      'dueDate': dueDate != null ? Timestamp.fromDate(dueDate!) : null,
     };
   }
 
@@ -106,6 +180,8 @@ class LendingTransaction {
       handoverAt: parseTimestamp(data['handoverAt']),
       completedAt: parseTimestamp(data['completedAt']),
       completionType: data['completionType'],
+      borrowDurationDays: data['borrowDurationDays'],
+      dueDate: parseTimestamp(data['dueDate']),
     );
   }
 
@@ -123,6 +199,8 @@ class LendingTransaction {
     DateTime? handoverAt,
     DateTime? completedAt,
     String? completionType,
+    int? borrowDurationDays,
+    DateTime? dueDate,
   }) {
     return LendingTransaction(
       id: id ?? this.id,
@@ -138,6 +216,8 @@ class LendingTransaction {
       handoverAt: handoverAt ?? this.handoverAt,
       completedAt: completedAt ?? this.completedAt,
       completionType: completionType ?? this.completionType,
+      borrowDurationDays: borrowDurationDays ?? this.borrowDurationDays,
+      dueDate: dueDate ?? this.dueDate,
     );
   }
 }

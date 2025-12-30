@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'models/transaction.dart';
+import 'services/rating_service.dart';
+import 'widgets/rating_dialog.dart';
 import 'app_theme.dart';
 
 // Filter options for transactions
@@ -135,6 +137,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           details: _buildLentDetails(transaction),
           completionType: transaction.completionType,
           isCompleted: transaction.status == TransactionStatus.completed,
+          transactionId: transaction.id,
+          otherUserId: transaction.borrowerId,
+          otherUserName: 'Borrower',
         ));
       }
 
@@ -156,6 +161,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           details: _buildBorrowedDetails(transaction),
           completionType: transaction.completionType,
           isCompleted: transaction.status == TransactionStatus.completed,
+          transactionId: transaction.id,
+          otherUserId: transaction.lenderId,
+          otherUserName: 'Lender',
         ));
       }
 
@@ -527,6 +535,10 @@ class _TransactionEntry {
   final String details;
   final String? completionType;
   final bool isCompleted;
+  // Rating-related fields
+  final String? transactionId;
+  final String? otherUserId;
+  final String? otherUserName;
 
   _TransactionEntry({
     required this.type,
@@ -539,6 +551,9 @@ class _TransactionEntry {
     required this.details,
     this.completionType,
     this.isCompleted = false,
+    this.transactionId,
+    this.otherUserId,
+    this.otherUserName,
   });
 
   String get typeLabel {
@@ -566,7 +581,7 @@ class _TransactionEntry {
   }
 }
 
-class _TransactionCard extends StatelessWidget {
+class _TransactionCard extends StatefulWidget {
   final _TransactionEntry entry;
   final String Function(DateTime) formatFullDateTime;
 
@@ -576,7 +591,74 @@ class _TransactionCard extends StatelessWidget {
   });
 
   @override
+  State<_TransactionCard> createState() => _TransactionCardState();
+}
+
+class _TransactionCardState extends State<_TransactionCard> {
+  bool _hasRated = false;
+  bool _checkingRating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfAlreadyRated();
+  }
+
+  Future<void> _checkIfAlreadyRated() async {
+    if (widget.entry.transactionId == null || !widget.entry.isCompleted) return;
+    if (widget.entry.type == TransactionType.posted) return;
+    
+    setState(() => _checkingRating = true);
+    try {
+      final hasRated = await RatingService.hasRatedTransaction(widget.entry.transactionId!);
+      if (mounted) {
+        setState(() {
+          _hasRated = hasRated;
+          _checkingRating = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _checkingRating = false);
+    }
+  }
+
+  Future<void> _showRatingDialog() async {
+    if (widget.entry.transactionId == null || widget.entry.otherUserId == null) return;
+
+    final isLender = widget.entry.type == TransactionType.lent;
+    
+    await showDialog(
+      context: context,
+      builder: (context) => RatingDialog(
+        itemName: widget.entry.itemName,
+        transactionId: widget.entry.transactionId,
+        ratedUserId: widget.entry.otherUserId,
+        ratedUserName: widget.entry.otherUserName,
+        isRatingLender: !isLender, // If I'm lender, I'm rating borrower (not lender)
+        onRatingSubmitted: (rating, comment) async {
+          try {
+            await RatingService.submitRating(
+              transactionId: widget.entry.transactionId!,
+              ratedUserId: widget.entry.otherUserId!,
+              rating: rating.toDouble(),
+              comment: comment,
+              itemName: widget.entry.itemName,
+              ratedAsLender: !isLender, // The rated user was lender if I'm borrower
+            );
+            if (mounted) {
+              setState(() => _hasRated = true);
+            }
+          } catch (e) {
+            debugPrint('Failed to submit rating: $e');
+          }
+        },
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final entry = widget.entry;
     return Container(
       margin: const EdgeInsets.only(bottom: AppTheme.spacing12),
       decoration: AppTheme.cardDecoration,
@@ -667,7 +749,7 @@ class _TransactionCard extends StatelessWidget {
                 Icon(Icons.access_time, size: 14, color: Colors.grey.shade500),
                 const SizedBox(width: 4),
                 Text(
-                  formatFullDateTime(entry.timestamp),
+                  widget.formatFullDateTime(entry.timestamp),
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontSize: 13,
@@ -738,6 +820,57 @@ class _TransactionCard extends StatelessWidget {
                 ),
               ),
             ],
+            // Rate button for completed lent/borrowed transactions
+            if (entry.isCompleted && 
+                entry.type != TransactionType.posted &&
+                entry.transactionId != null &&
+                entry.otherUserId != null) ...[
+              const SizedBox(height: 12),
+              if (_checkingRating)
+                const SizedBox(
+                  height: 36,
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+              else if (_hasRated)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green.shade600, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        'You rated this ${entry.otherUserName}',
+                        style: TextStyle(
+                          color: Colors.green.shade600,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _showRatingDialog,
+                    icon: const Icon(Icons.star_outline, size: 18),
+                    label: Text('Rate ${entry.otherUserName}'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.amber.shade700,
+                      side: BorderSide(color: Colors.amber.shade300),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+            ],
           ],
         ),
       ),
@@ -745,6 +878,7 @@ class _TransactionCard extends StatelessWidget {
   }
 
   String _getCompletionMessage() {
+    final entry = widget.entry;
     if (entry.type == TransactionType.lent) {
       return entry.completionType == 'returned'
           ? 'Item returned successfully'

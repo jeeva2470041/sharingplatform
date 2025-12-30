@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/item.dart';
 import 'transaction_service.dart';
 
@@ -8,10 +10,55 @@ import 'transaction_service.dart';
 class ItemService {
   static final _firestore = FirebaseFirestore.instance;
   static final _itemsCollection = _firestore.collection('items');
+  static final _storage = FirebaseStorage.instance;
 
   /// Get current user ID
   static String get _currentUserId =>
       FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+
+  /// Upload image to Firebase Storage and return download URL
+  static Future<String> uploadItemImage(
+    Uint8List imageBytes,
+    String itemId,
+    int imageIndex,
+  ) async {
+    final ref = _storage.ref().child('items/$itemId/image_$imageIndex.jpg');
+    
+    final metadata = SettableMetadata(
+      contentType: 'image/jpeg',
+      customMetadata: {'uploadedBy': _currentUserId},
+    );
+    
+    await ref.putData(imageBytes, metadata);
+    return await ref.getDownloadURL();
+  }
+
+  /// Upload multiple images and return list of URLs
+  static Future<List<String>> uploadItemImages(
+    List<Uint8List> images,
+    String itemId,
+  ) async {
+    final urls = <String>[];
+    for (int i = 0; i < images.length; i++) {
+      final url = await uploadItemImage(images[i], itemId, i);
+      urls.add(url);
+    }
+    return urls;
+  }
+
+  /// Delete all images for an item
+  static Future<void> deleteItemImages(String itemId) async {
+    try {
+      final ref = _storage.ref().child('items/$itemId');
+      final result = await ref.listAll();
+      for (final item in result.items) {
+        await item.delete();
+      }
+    } catch (e) {
+      // Ignore errors if folder doesn't exist
+      print('Error deleting item images: $e');
+    }
+  }
 
   /// Stream of ALL items (for admin/debugging) - excludes deleted
   static Stream<List<Item>> get allItemsStream {

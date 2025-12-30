@@ -16,6 +16,7 @@ class Item {
   final DateTime? createdAt;
   final bool isDeleted; // Soft delete flag
   final DateTime? deletedAt; // When the item was deleted
+  final List<String> imageUrls; // Item images stored in Firebase Storage
 
   Item({
     required this.id,
@@ -31,6 +32,7 @@ class Item {
     this.createdAt,
     this.isDeleted = false,
     this.deletedAt,
+    this.imageUrls = const [],
   });
 
   String get statusText {
@@ -66,6 +68,7 @@ class Item {
       'createdAt': createdAt?.toIso8601String(),
       'isDeleted': isDeleted,
       'deletedAt': deletedAt?.toIso8601String(),
+      'imageUrls': imageUrls,
     };
   }
 
@@ -90,6 +93,7 @@ class Item {
           : Timestamp.now(),
       'isDeleted': isDeleted,
       'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
+      'imageUrls': imageUrls,
     };
   }
 
@@ -113,6 +117,9 @@ class Item {
       deletedAt: json['deletedAt'] != null
           ? DateTime.parse(json['deletedAt'])
           : null,
+      imageUrls: json['imageUrls'] != null
+          ? List<String>.from(json['imageUrls'])
+          : [],
     );
   }
 
@@ -155,6 +162,9 @@ class Item {
       createdAt: createdAt,
       isDeleted: data['isDeleted'] ?? false,
       deletedAt: deletedAt,
+      imageUrls: data['imageUrls'] != null
+          ? List<String>.from(data['imageUrls'])
+          : [],
     );
   }
 
@@ -173,6 +183,7 @@ class Item {
     DateTime? createdAt,
     bool? isDeleted,
     DateTime? deletedAt,
+    List<String>? imageUrls,
   }) {
     return Item(
       id: id ?? this.id,
@@ -188,6 +199,7 @@ class Item {
       createdAt: createdAt ?? this.createdAt,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
+      imageUrls: imageUrls ?? this.imageUrls,
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
+import 'models/transaction.dart';
 import 'widgets/status_badge.dart';
 import 'widgets/rating_dialog.dart';
 import 'widgets/profile_guard.dart';
@@ -165,6 +166,58 @@ class _ItemCardState extends State<ItemCard> {
     }
   }
 
+  Widget _buildItemImage() {
+    if (widget.item.imageUrls.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.network(
+          widget.item.imageUrls.first,
+          width: 70,
+          height: 70,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return _buildFallbackIcon();
+          },
+        ),
+      );
+    }
+    return _buildFallbackIcon();
+  }
+
+  Widget _buildFallbackIcon() {
+    return Container(
+      width: 70,
+      height: 70,
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Icon(
+        _categoryIcon(widget.item.category),
+        color: AppTheme.primary,
+        size: 28,
+      ),
+    );
+  }
+
   Future<void> _requestItem() async {
     // Check profile completion before allowing borrowing
     final canProceed = await ProfileGuard.checkProfileComplete(
@@ -186,97 +239,21 @@ class _ItemCardState extends State<ItemCard> {
       return;
     }
 
+    // Show request dialog with duration selection
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Confirm Request',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Card(
-              elevation: 0,
-              color: Colors.grey.shade50,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.shade200),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Text(
-                      widget.item.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.item.category,
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Deposit Required: ₹${widget.item.deposit}',
-                        style: TextStyle(
-                          color: Colors.orange.shade800,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context); // Close bottom sheet
-                _processRequest();
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Confirm Request',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        ),
+      builder: (context) => _BorrowRequestSheet(
+        item: widget.item,
+        onConfirm: (duration) => _processRequest(duration),
       ),
     );
   }
 
-  Future<void> _processRequest() async {
+  Future<void> _processRequest(int borrowDurationDays) async {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
     final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
 
@@ -300,6 +277,7 @@ class _ItemCardState extends State<ItemCard> {
         itemName: widget.item.name,
         lenderId: widget.item.ownerId,
         depositAmount: depositAmount,
+        borrowDurationDays: borrowDurationDays,
       );
 
       if (!mounted) return;
@@ -359,17 +337,21 @@ class _ItemCardState extends State<ItemCard> {
   }
 
   void _returnItem() {
+    // Note: This is a simplified return flow without QR verification.
+    // The proper flow uses ReturnQrScreen which includes user rating.
     showDialog(
       context: context,
       builder: (context) => RatingDialog(
         itemName: widget.item.name,
-        onRatingSubmitted: (rating) async {
+        ratedUserName: widget.item.ownerName ?? 'the lender',
+        isRatingLender: true, // Borrower rating lender
+        onRatingSubmitted: (rating, comment) async {
           final currentUserId =
               FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
           final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
 
           try {
-            // Calculate new rating
+            // Calculate new rating for item
             final newRating =
                 ((widget.item.rating ?? 0) * (widget.item.ratingCount ?? 0) +
                     rating) /
@@ -445,19 +427,8 @@ class _ItemCardState extends State<ItemCard> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    _categoryIcon(widget.item.category),
-                    color: AppTheme.primary,
-                    size: 28,
-                  ),
-                ),
+                // Item image or category icon
+                _buildItemImage(),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -678,5 +649,168 @@ class _ItemCardState extends State<ItemCard> {
         ),
       ),
     );
+  }
+}
+
+/// Bottom sheet for selecting borrow duration and confirming request
+class _BorrowRequestSheet extends StatefulWidget {
+  final Item item;
+  final Function(int) onConfirm;
+
+  const _BorrowRequestSheet({
+    required this.item,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_BorrowRequestSheet> createState() => _BorrowRequestSheetState();
+}
+
+class _BorrowRequestSheetState extends State<_BorrowRequestSheet> {
+  BorrowDuration _selectedDuration = BorrowDuration.oneWeek;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Confirm Borrow Request',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          
+          // Item info card
+          Card(
+            elevation: 0,
+            color: Colors.grey.shade50,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.grey.shade200),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Text(
+                    widget.item.name,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.item.category,
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Deposit Required: ₹${widget.item.deposit}',
+                      style: TextStyle(
+                        color: Colors.orange.shade800,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // Duration selection
+          const Text(
+            'Select Borrow Duration',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: BorrowDuration.values
+                .where((d) => d != BorrowDuration.custom)
+                .map((duration) => _buildDurationChip(duration))
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Due date: ${_calculateDueDate()}',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Confirm button
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onConfirm(_selectedDuration.days);
+            },
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Confirm Request (${_selectedDuration.label})',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDurationChip(BorrowDuration duration) {
+    final isSelected = _selectedDuration == duration;
+    return ChoiceChip(
+      label: Text(duration.label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() => _selectedDuration = duration);
+        }
+      },
+      selectedColor: AppTheme.primary.withOpacity(0.2),
+      labelStyle: TextStyle(
+        color: isSelected ? AppTheme.primary : Colors.grey.shade700,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      ),
+    );
+  }
+
+  String _calculateDueDate() {
+    final dueDate = DateTime.now().add(Duration(days: _selectedDuration.days));
+    return '${dueDate.day}/${dueDate.month}/${dueDate.year}';
   }
 }

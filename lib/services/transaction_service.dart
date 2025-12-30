@@ -169,6 +169,7 @@ class TransactionService {
     required String itemName,
     required String lenderId,
     required double depositAmount,
+    int? borrowDurationDays,
   }) async {
     // Safety: Prevent borrowing own items
     if (lenderId == _currentUserId) {
@@ -186,6 +187,7 @@ class TransactionService {
       depositAmount: depositAmount,
       status: TransactionStatus.requested,
       createdAt: DateTime.now(),
+      borrowDurationDays: borrowDurationDays,
     );
 
     await _transactionsCollection
@@ -329,14 +331,21 @@ class TransactionService {
       // Step 2: Persist wallet changes immediately
       await MockData.saveWallet();
 
-      // Step 3: Update transaction status to ACTIVE with handover timestamp
+      // Step 3: Calculate due date based on borrow duration
+      DateTime? dueDate;
+      if (transaction.borrowDurationDays != null && transaction.borrowDurationDays! > 0) {
+        dueDate = DateTime.now().add(Duration(days: transaction.borrowDurationDays!));
+      }
+
+      // Step 4: Update transaction status to ACTIVE with handover timestamp
       await _transactionsCollection.doc(transaction.id).update({
         'status': TransactionStatus.active.index,
         'handoverAt': Timestamp.now(),
         'handoverConfirmed': true,
+        'dueDate': dueDate != null ? Timestamp.fromDate(dueDate) : null,
       });
 
-      // Step 4: Update item status to show it's actively borrowed
+      // Step 5: Update item status to show it's actively borrowed
       await ItemService.updateItemStatus(transaction.itemId, ItemStatus.active);
 
       // Log for debugging
@@ -345,6 +354,9 @@ class TransactionService {
       print('   Deposit locked: ₹${transaction.depositAmount}');
       print('   New balance: ₹${borrowerWallet.balance}');
       print('   Locked deposit: ₹${borrowerWallet.lockedDeposit}');
+      if (dueDate != null) {
+        print('   Due date: $dueDate');
+      }
     } catch (e) {
       // If transaction update fails after wallet update, we need to rollback
       // Release the locked deposit back to balance
