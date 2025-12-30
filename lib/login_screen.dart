@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
 import 'services/auth_service.dart';
@@ -16,10 +17,14 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   String _errorMessage = '';
   bool _isPasswordVisible = false;
+  bool _isLoading = false;
 
   Future<void> _login() async {
+    if (_isLoading) return;
+    
     setState(() {
       _errorMessage = '';
+      _isLoading = true;
     });
 
     final email = _emailController.text.trim();
@@ -28,6 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!email.endsWith('@xyz.edu.in')) {
       setState(() {
         _errorMessage = 'Only @xyz.edu.in email IDs are allowed.';
+        _isLoading = false;
       });
       return;
     }
@@ -35,6 +41,58 @@ class _LoginScreenState extends State<LoginScreen> {
     final error = await AuthService().login(email: email, password: password);
 
     if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (error != null) {
+      setState(() {
+        _errorMessage = error;
+      });
+    }
+    // Success: Firebase authStateChanges will redirect automatically
+  }
+
+  Future<void> _signInWithGoogle() async {
+    if (_isLoading) return;
+    
+    setState(() {
+      _errorMessage = '';
+      _isLoading = true;
+    });
+
+    final error = await AuthService().signInWithGoogle();
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (error != null) {
+      setState(() {
+        _errorMessage = error;
+      });
+    }
+    // Success: Firebase authStateChanges will redirect automatically
+  }
+
+  Future<void> _signInWithApple() async {
+    if (_isLoading) return;
+    
+    setState(() {
+      _errorMessage = '';
+      _isLoading = true;
+    });
+
+    final error = await AuthService().signInWithApple();
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+    });
 
     if (error != null) {
       setState(() {
@@ -153,11 +211,114 @@ class _LoginScreenState extends State<LoginScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _login,
+                              onPressed: _isLoading ? null : _login,
                               style: AppTheme.primaryButtonStyle,
-                              child: const Text('Login'),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Text('Login'),
                             ),
                           ),
+                          const SizedBox(height: AppTheme.spacing24),
+                          // Divider with "OR"
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 1,
+                                  color: AppTheme.border,
+                                ),
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: AppTheme.spacing16),
+                                child: Text(
+                                  'OR',
+                                  style: TextStyle(
+                                    fontFamily: AppTheme.fontFamily,
+                                    color: AppTheme.textSecondary,
+                                    fontWeight: AppTheme.fontWeightMedium,
+                                    fontSize: AppTheme.fontSizeLabel,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Container(
+                                  height: 1,
+                                  color: AppTheme.border,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppTheme.spacing24),
+                          // Google Sign-In Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _isLoading ? null : _signInWithGoogle,
+                              icon: Image.network(
+                                'https://www.google.com/favicon.ico',
+                                height: 20,
+                                width: 20,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(Icons.g_mobiledata, size: 24),
+                              ),
+                              label: const Text('Continue with Google'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.textPrimary,
+                                side: const BorderSide(color: AppTheme.border),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: AppTheme.spacing16,
+                                  horizontal: AppTheme.spacing24,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                                ),
+                                textStyle: const TextStyle(
+                                  fontFamily: AppTheme.fontFamily,
+                                  fontWeight: AppTheme.fontWeightSemibold,
+                                  fontSize: AppTheme.fontSizeBody,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Apple Sign-In Button (iOS/macOS only)
+                          if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS)) ...[
+                            const SizedBox(height: AppTheme.spacing12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _isLoading ? null : _signInWithApple,
+                                icon: const Icon(Icons.apple, size: 24),
+                                label: const Text('Continue with Apple'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.textPrimary,
+                                  backgroundColor: Colors.black,
+                                  side: const BorderSide(color: Colors.black),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: AppTheme.spacing16,
+                                    horizontal: AppTheme.spacing24,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontFamily: AppTheme.fontFamily,
+                                    fontWeight: AppTheme.fontWeightSemibold,
+                                    fontSize: AppTheme.fontSizeBody,
+                                    color: Colors.white,
+                                  ),
+                                ).copyWith(
+                                  foregroundColor: WidgetStateProperty.all(Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: AppTheme.spacing16),
                           TextButton(
                             onPressed: () {
