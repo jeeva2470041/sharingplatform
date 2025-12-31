@@ -32,8 +32,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final ExpansionTileController _lentTileController = ExpansionTileController();
-  final ExpansionTileController _borrowedTileController = ExpansionTileController();
+  final ExpansibleController _lentTileController = ExpansibleController();
+  final ExpansibleController _borrowedTileController = ExpansibleController();
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _itemKeys = {};
   String? _highlightItemId;
@@ -126,6 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   /// Get items posted by current user (LENDER role)
+  // ignore: unused_element
   List<Item> _getMyPostedItems() {
     final currentUserId = _getCurrentUserId();
     return MockData.allItems
@@ -134,6 +135,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   /// Get items borrowed by current user (BORROWER role)
+  // ignore: unused_element
   List<Item> _getMyBorrowedItems() {
     final currentUserId = _getCurrentUserId();
     return MockData.allItems
@@ -236,7 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             fontSize: 13,
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                           ),
                         ),
                       ],
@@ -576,6 +578,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Keep _buildFeatureRow, _ActionCard, and _ActivityItemCard unchanged
 
+  // ignore: unused_element
   Widget _buildFeatureRow(String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -612,8 +615,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           decoration: BoxDecoration(
             color: isDanger
-                ? Colors.white.withOpacity(0.1)
-                : Colors.white.withOpacity(0.15),
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
           ),
           child: Row(
@@ -783,6 +786,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
   }
 
   /// Settlement for damaged/kept items - transfers deposit from borrower to lender
+  // ignore: unused_element
   Future<void> _settleItem() async {
     try {
       final depositAmount = double.tryParse(widget.item.deposit) ?? 0;
@@ -830,6 +834,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
       return;
     }
 
+    if (!mounted) return;
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
@@ -854,9 +859,9 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.warning.withOpacity(0.1),
+                color: AppTheme.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+                border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -925,7 +930,6 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
   }
 
   void _openChat() {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
     final otherUserId = widget.isOwner
         ? (widget.item.borrowerId ?? 'unknown')
         : widget.item.ownerId;
@@ -1047,7 +1051,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
       }
     } catch (e) {
       if (!mounted) return;
-      print('Return error: $e');
+      debugPrint('Return error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.danger),
       );
@@ -1195,32 +1199,32 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
               borderRadius: BorderRadius.circular(AppTheme.cardRadius),
               border: isGlowing
                   ? Border.all(
-                      color: Colors.lightBlueAccent.withOpacity(0.8 + (glowIntensity * 0.2)),
+                      color: Colors.lightBlueAccent.withValues(alpha: 0.8 + (glowIntensity * 0.2)),
                       width: 2.5 + (glowIntensity * 1.5),
                     )
                   : isActive
-                      ? Border.all(color: AppTheme.primary.withOpacity(0.4), width: 2)
+                      ? Border.all(color: AppTheme.primary.withValues(alpha: 0.4), width: 2)
                       : isApproved
-                          ? Border.all(color: AppTheme.success.withOpacity(0.3), width: 1)
+                          ? Border.all(color: AppTheme.success.withValues(alpha: 0.3), width: 1)
                           : Border.all(color: AppTheme.border),
               boxShadow: isGlowing
                   ? [
                       // Inner glow - bright blue
                       BoxShadow(
-                        color: Colors.lightBlueAccent.withOpacity(glowIntensity * 0.7),
+                        color: Colors.lightBlueAccent.withValues(alpha: glowIntensity * 0.7),
                         blurRadius: 12 + (glowIntensity * 16),
                         spreadRadius: glowIntensity * 3,
                       ),
                       // Outer lightning glow - electric blue
                       BoxShadow(
-                        color: Colors.cyanAccent.withOpacity(glowIntensity * 0.5),
+                        color: Colors.cyanAccent.withValues(alpha: glowIntensity * 0.5),
                         blurRadius: 20 + (glowIntensity * 12),
                         spreadRadius: glowIntensity * 6,
                       ),
                     ]
                   : [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         offset: const Offset(0, 2),
                         blurRadius: 8,
                       ),
@@ -1241,8 +1245,8 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
                     height: 50,
                     decoration: BoxDecoration(
                       color: isApproved
-                          ? AppTheme.success.withOpacity(0.1)
-                          : AppTheme.primary.withOpacity(0.1),
+                          ? AppTheme.success.withValues(alpha: 0.1)
+                          : AppTheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(AppTheme.cardRadius),
                     ),
                     child: Icon(
@@ -1351,7 +1355,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
                   Container(
                     padding: const EdgeInsets.all(AppTheme.spacing12),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
+                      color: AppTheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
                     ),
                     child: Row(
@@ -1392,7 +1396,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
                   Container(
                     padding: const EdgeInsets.all(AppTheme.spacing12),
                     decoration: BoxDecoration(
-                      color: AppTheme.warning.withOpacity(0.1),
+                      color: AppTheme.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
                     ),
                     child: Row(
@@ -1438,7 +1442,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
                           vertical: AppTheme.spacing4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.primary.withOpacity(0.1),
+                          color: AppTheme.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(AppTheme.cardRadius),
                         ),
                         child: Row(
@@ -1491,7 +1495,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
                   Container(
                     padding: const EdgeInsets.all(AppTheme.spacing12),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
+                      color: AppTheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
                     ),
                     child: Row(

@@ -123,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           // Dark Overlay
           Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.2)),
+            child: Container(color: Colors.black.withValues(alpha: 0.2)),
           ),
           // Login Card
           Center(
@@ -138,12 +138,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: AppTheme.cardBackground.withOpacity(0.95),
+                      color: AppTheme.cardBackground.withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(AppTheme.cardRadius),
                       border: Border.all(color: AppTheme.border, width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.primary.withOpacity(0.2),
+                          color: AppTheme.primary.withValues(alpha: 0.2),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
@@ -345,9 +345,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(AppTheme.spacing12),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.danger.withOpacity(0.1),
+                                  color: AppTheme.danger.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
-                                  border: Border.all(color: AppTheme.danger.withOpacity(0.3)),
+                                  border: Border.all(color: AppTheme.danger.withValues(alpha: 0.3)),
                                 ),
                                 child: Text(
                                   _errorMessage,

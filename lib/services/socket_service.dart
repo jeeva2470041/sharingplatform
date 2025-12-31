@@ -1,7 +1,8 @@
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:flutter/foundation.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 class SocketService {
-  late IO.Socket socket;
+  late io.Socket socket;
   bool _isConnected = false;
 
   bool get isConnected => _isConnected;
@@ -13,7 +14,7 @@ class SocketService {
     // For Real Device use: http://YOUR_PC_IP:3000
     const String serverUrl = 'http://localhost:3000'; 
 
-    socket = IO.io(serverUrl, IO.OptionBuilder()
+    socket = io.io(serverUrl, io.OptionBuilder()
         .setTransports(['websocket'])
         .disableAutoConnect()
         .build());
@@ -21,17 +22,17 @@ class SocketService {
     socket.connect();
 
     socket.onConnect((_) {
-      print('Connected to socket server');
+      debugPrint('Connected to socket server');
       _isConnected = true;
     });
 
     socket.onDisconnect((_) {
-      print('Disconnected from socket server');
+      debugPrint('Disconnected from socket server');
       _isConnected = false;
     });
 
     socket.onConnectError((data) {
-      print('Connect Error: $data');
+      debugPrint('Connect Error: $data');
     });
   }
 

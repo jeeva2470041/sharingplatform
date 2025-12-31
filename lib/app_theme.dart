@@ -138,7 +138,7 @@ class AppTheme {
         border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -250,10 +250,10 @@ class AppTheme {
   static ButtonStyle get primaryOutlinedButtonStyle => ButtonStyle(
         backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
           if (states.contains(WidgetState.pressed)) {
-            return primary.withOpacity(0.1);
+            return primary.withValues(alpha: 0.1);
           }
           if (states.contains(WidgetState.hovered)) {
-            return primary.withOpacity(0.05);
+            return primary.withValues(alpha: 0.05);
           }
           return Colors.transparent;
         }),
@@ -335,10 +335,10 @@ class AppTheme {
   static ButtonStyle get dangerOutlinedButtonStyle => ButtonStyle(
         backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
           if (states.contains(WidgetState.pressed)) {
-            return danger.withOpacity(0.1);
+            return danger.withValues(alpha: 0.1);
           }
           if (states.contains(WidgetState.hovered)) {
-            return danger.withOpacity(0.05);
+            return danger.withValues(alpha: 0.05);
           }
           return Colors.transparent;
         }),

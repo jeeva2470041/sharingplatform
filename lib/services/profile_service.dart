@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_profile.dart';
 
 /// Service for managing user profiles
@@ -43,7 +44,7 @@ class ProfileService {
       final profile = await getCurrentProfile();
       return profile.isCompleted && profile.hasAllRequiredFields;
     } catch (e) {
-      print('Error checking profile: $e');
+      debugPrint('Error checking profile: $e');
       return false;
     }
   }

@@ -141,7 +141,7 @@ class _NotificationDropdownState extends State<NotificationDropdown> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: _isOpen ? Colors.white24 : Colors.white.withOpacity(0.15),
+                color: _isOpen ? Colors.white24 : Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -258,7 +258,7 @@ class _NotificationListState extends State<_NotificationList> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(12)),
             ),
@@ -510,7 +510,7 @@ class _NotificationListState extends State<_NotificationList> {
               shrinkWrap: true,
               padding: EdgeInsets.zero,
               itemCount: notifications.length > 10 ? 10 : notifications.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, index) =>
                   Divider(height: 1, color: Colors.grey.shade200),
               itemBuilder: (context, index) {
                 final notification = notifications[index];
@@ -564,7 +564,7 @@ class _NotificationTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
-        color: isPending ? AppTheme.warning.withOpacity(0.05) : null,
+        color: isPending ? AppTheme.warning.withValues(alpha: 0.05) : null,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -572,7 +572,7 @@ class _NotificationTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: color, size: 20),

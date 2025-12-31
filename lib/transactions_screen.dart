@@ -130,7 +130,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         entries.add(_TransactionEntry(
           type: TransactionType.lent,
           itemName: transaction.itemName,
-          deposit: '${transaction.depositAmount.toStringAsFixed(0)}',
+          deposit: transaction.depositAmount.toStringAsFixed(0),
           timestamp: transaction.handoverAt ?? transaction.createdAt,
           status: _getTransactionStatusText(transaction.status),
           statusColor: _getTransactionStatusColor(transaction.status),
@@ -154,7 +154,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         entries.add(_TransactionEntry(
           type: TransactionType.borrowed,
           itemName: transaction.itemName,
-          deposit: '${transaction.depositAmount.toStringAsFixed(0)}',
+          deposit: transaction.depositAmount.toStringAsFixed(0),
           timestamp: transaction.handoverAt ?? transaction.createdAt,
           status: _getTransactionStatusText(transaction.status),
           statusColor: _getTransactionStatusColor(transaction.status),
@@ -175,7 +175,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading transactions: $e');
+      debugPrint('Error loading transactions: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -224,7 +224,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       case 1: return AppTheme.warning;
       case 2: return AppTheme.primary;
       case 3: return AppTheme.primaryPressed;
-      case 4: return AppTheme.success;
+      case 4: return const Color.fromARGB(255, 36, 208, 99);
       case 5: return AppTheme.textSecondary;
       default: return AppTheme.textSecondary;
     }
@@ -324,7 +324,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               borderRadius: BorderRadius.circular(AppTheme.cardRadius),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -383,7 +383,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                                 vertical: AppTheme.spacing8,
                               ),
                               decoration: BoxDecoration(
-                                color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+                                color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
                                   color: isSelected ? color : Colors.grey.shade300,
@@ -470,9 +470,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         margin: const EdgeInsets.all(AppTheme.spacing24),
         padding: const EdgeInsets.all(AppTheme.spacing24),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
+          color: color.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -489,7 +489,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                               ? Icons.check_circle_outline
                               : Icons.cancel_outlined,
               size: 56,
-              color: color.withOpacity(0.6),
+              color: color.withValues(alpha: 0.6),
             ),
             const SizedBox(height: AppTheme.spacing16),
             Text(
@@ -674,9 +674,9 @@ class _TransactionCardState extends State<_TransactionCard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: entry.typeColor.withOpacity(0.1),
+                    color: entry.typeColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: entry.typeColor.withOpacity(0.3)),
+                    border: Border.all(color: entry.typeColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -700,7 +700,7 @@ class _TransactionCardState extends State<_TransactionCard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: entry.statusColor.withOpacity(0.1),
+                    color: entry.statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

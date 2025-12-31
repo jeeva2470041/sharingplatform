@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/transaction.dart';
 import '../models/item.dart';
 import '../data/mock_data.dart';
@@ -55,7 +56,7 @@ class TransactionService {
                 transaction.depositAmount,
                 tid,
               ); // Removes ID
-              print(
+              debugPrint(
                 '✅ Synced (ID): Refunded ₹${transaction.depositAmount} (Item Returned)',
               );
             } else {
@@ -64,7 +65,7 @@ class TransactionService {
                 transaction.depositAmount,
                 tid,
               ); // Removes ID
-              print(
+              debugPrint(
                 '✅ Synced (ID): Cleared Locked ₹${transaction.depositAmount} (Item Kept/Damaged)',
               );
             }
@@ -90,7 +91,7 @@ class TransactionService {
 
       // If we differ significantly (e.g. Locked=30, Target=0)
       if ((wallet.lockedDeposit - targetLocked).abs() > 0.01) {
-        print(
+        debugPrint(
           '⚠️ Wallet Audit: Mismatch detected. Locked: ₹${wallet.lockedDeposit}, Target: ₹$targetLocked',
         );
 
@@ -129,14 +130,14 @@ class TransactionService {
           if (foundJustification) {
             // We found a return that likely explains the difference -> Refund
             wallet.balance += difference;
-            print(
+            debugPrint(
               '✅ Audit: Refunded ₹$difference to balance (Matched recent return)',
             );
           } else {
             // We found NO return explaining this. Assume it was 'Kept/Damaged'.
             // DO NOT REFUND. Just fix the locked amount.
             // This fixes the bug where "Damaged" caused an incorrect refund.
-            print(
+            debugPrint(
               '✅ Audit: Burned ₹$difference from locked (Assumed Kept/Damaged due to no Return record)',
             );
           }
@@ -144,7 +145,7 @@ class TransactionService {
           // Locked < Target. We are missing locked funds.
           // Deduct from balance to cover it.
           wallet.balance += difference; // difference is negative
-          print(
+          debugPrint(
             '⚠️ Audit: Deducted ₹${difference.abs()} from balance to fix locked deposit',
           );
         }
@@ -155,10 +156,10 @@ class TransactionService {
 
       if (walletChanged) {
         await MockData.saveWallet();
-        print('💰 Wallet synced successfully');
+        debugPrint('💰 Wallet synced successfully');
       }
     } catch (e) {
-      print('Wallet sync error: $e');
+      debugPrint('Wallet sync error: $e');
     }
   }
 
@@ -349,13 +350,13 @@ class TransactionService {
       await ItemService.updateItemStatus(transaction.itemId, ItemStatus.active);
 
       // Log for debugging
-      print('✅ Handover confirmed for transaction ${transaction.id}');
-      print('   Borrower: ${transaction.borrowerId}');
-      print('   Deposit locked: ₹${transaction.depositAmount}');
-      print('   New balance: ₹${borrowerWallet.balance}');
-      print('   Locked deposit: ₹${borrowerWallet.lockedDeposit}');
+      debugPrint('✅ Handover confirmed for transaction ${transaction.id}');
+      debugPrint('   Borrower: ${transaction.borrowerId}');
+      debugPrint('   Deposit locked: ₹${transaction.depositAmount}');
+      debugPrint('   New balance: ₹${borrowerWallet.balance}');
+      debugPrint('   Locked deposit: ₹${borrowerWallet.lockedDeposit}');
       if (dueDate != null) {
-        print('   Due date: $dueDate');
+        debugPrint('   Due date: $dueDate');
       }
     } catch (e) {
       // If transaction update fails after wallet update, we need to rollback
@@ -403,7 +404,7 @@ class TransactionService {
       'returnQrCode': returnQrCode,
     });
 
-    print('📋 Return QR generated for transaction $transactionId');
+    debugPrint('📋 Return QR generated for transaction $transactionId');
     return returnQrCode;
   }
 
@@ -459,14 +460,14 @@ class TransactionService {
         // REFUND: Borrower gets deposit back
         // The borrower's wallet will be updated when they refresh their browser
         completionType = 'returned';
-        print('✅ Item returned safely - deposit will be refunded to borrower');
+        debugPrint('✅ Item returned safely - deposit will be refunded to borrower');
       } else {
         // CLAIM: Lender receives the deposit
         // Add deposit to lender's wallet (lender is on this browser)
         lenderWallet.receiveTransferredDeposit(transaction.depositAmount);
         await MockData.saveWallet();
         completionType = 'kept_or_damaged';
-        print('✅ Deposit transferred to lender: ₹${transaction.depositAmount}');
+        debugPrint('✅ Deposit transferred to lender: ₹${transaction.depositAmount}');
       }
 
       // Update transaction to COMPLETED - this is the source of truth
@@ -483,9 +484,9 @@ class TransactionService {
         await ItemService.settleItem(transaction.itemId);
       }
 
-      print('✅ Return confirmed for transaction ${transaction.id}');
-      print('   Completion type: $completionType');
-      print('   Lender balance: ₹${lenderWallet.balance}');
+      debugPrint('✅ Return confirmed for transaction ${transaction.id}');
+      debugPrint('   Completion type: $completionType');
+      debugPrint('   Lender balance: ₹${lenderWallet.balance}');
     } catch (e) {
       throw Exception('Failed to complete return: $e');
     }

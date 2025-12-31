@@ -181,7 +181,7 @@ class _ItemCardState extends State<ItemCard> {
               width: 70,
               height: 70,
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.1),
+                color: AppTheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Center(
@@ -207,7 +207,7 @@ class _ItemCardState extends State<ItemCard> {
       width: 70,
       height: 70,
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.1),
+        color: AppTheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Icon(
@@ -230,6 +230,7 @@ class _ItemCardState extends State<ItemCard> {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
 
     if (widget.item.ownerId == currentUserId) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('You cannot borrow your own items'),
@@ -240,6 +241,7 @@ class _ItemCardState extends State<ItemCard> {
     }
 
     // Show request dialog with duration selection
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -414,7 +416,7 @@ class _ItemCardState extends State<ItemCard> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -621,7 +623,7 @@ class _ItemCardState extends State<ItemCard> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.success.withOpacity(0.1),
+                        color: AppTheme.success.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Row(
@@ -801,7 +803,7 @@ class _BorrowRequestSheetState extends State<_BorrowRequestSheet> {
           setState(() => _selectedDuration = duration);
         }
       },
-      selectedColor: AppTheme.primary.withOpacity(0.2),
+      selectedColor: AppTheme.primary.withValues(alpha: 0.2),
       labelStyle: TextStyle(
         color: isSelected ? AppTheme.primary : Colors.grey.shade700,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

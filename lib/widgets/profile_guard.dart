@@ -27,7 +27,7 @@ class ProfileGuard {
     } catch (e) {
       // If there's an error checking profile, allow the action
       // This prevents blocking users due to temporary issues
-      print('Profile check error: $e');
+      debugPrint('Profile check error: $e');
       return true;
     }
   }

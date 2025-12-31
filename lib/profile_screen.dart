@@ -201,7 +201,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             padding: const EdgeInsets.all(AppTheme.spacing12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(AppTheme.cardRadius),
             ),
             child: Icon(
@@ -231,7 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       : 'Required for lending and borrowing',
                   style: TextStyle(
                     fontFamily: AppTheme.fontFamily,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: AppTheme.fontSizeLabel,
                   ),
                 ),
@@ -279,7 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           // Department - Dropdown only
           DropdownButtonFormField<String>(
-            value: _selectedDepartment,
+            initialValue: _selectedDepartment,
             decoration: AppTheme.inputDecoration(
               label: 'Department *',
               hint: 'Select your department',
@@ -356,9 +356,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spacing12),
       decoration: BoxDecoration(
-        color: AppTheme.danger.withOpacity(0.1),
+        color: AppTheme.danger.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
-        border: Border.all(color: AppTheme.danger.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.danger.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [

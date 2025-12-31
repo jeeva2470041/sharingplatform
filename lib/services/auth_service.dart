@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -35,11 +36,11 @@ class AuthService {
       );
       return null; // Success
     } on FirebaseAuthException catch (e) {
-      print('FirebaseAuthException: ${e.code} - ${e.message}');
+      debugPrint('FirebaseAuthException: ${e.code} - ${e.message}');
       return _getErrorMessage(e.code);
     } catch (e) {
-      print('Register error type: ${e.runtimeType}');
-      print('Register error: $e');
+      debugPrint('Register error type: ${e.runtimeType}');
+      debugPrint('Register error: $e');
       
       // Check if it's a configuration error
       final errorStr = e.toString().toLowerCase();
@@ -71,11 +72,11 @@ class AuthService {
       );
       return null; // Success
     } on FirebaseAuthException catch (e) {
-      print('FirebaseAuthException: ${e.code} - ${e.message}');
+      debugPrint('FirebaseAuthException: ${e.code} - ${e.message}');
       return _getErrorMessage(e.code);
     } catch (e) {
-      print('Login error type: ${e.runtimeType}');
-      print('Login error: $e');
+      debugPrint('Login error type: ${e.runtimeType}');
+      debugPrint('Login error: $e');
       return 'Login failed: ${e.toString()}';
     }
   }
@@ -110,10 +111,10 @@ class AuthService {
       await _auth.signInWithCredential(credential);
       return null; // Success
     } on FirebaseAuthException catch (e) {
-      print('Google Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
+      debugPrint('Google Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
       return _getErrorMessage(e.code);
     } catch (e) {
-      print('Google Sign-In error: $e');
+      debugPrint('Google Sign-In error: $e');
       return 'Google Sign-In failed: ${e.toString()}';
     }
   }
@@ -171,16 +172,16 @@ class AuthService {
 
       return null; // Success
     } on SignInWithAppleAuthorizationException catch (e) {
-      print('Apple Sign-In Authorization Exception: ${e.code} - ${e.message}');
+      debugPrint('Apple Sign-In Authorization Exception: ${e.code} - ${e.message}');
       if (e.code == AuthorizationErrorCode.canceled) {
         return 'Sign-in cancelled';
       }
       return 'Apple Sign-In failed: ${e.message}';
     } on FirebaseAuthException catch (e) {
-      print('Apple Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
+      debugPrint('Apple Sign-In FirebaseAuthException: ${e.code} - ${e.message}');
       return _getErrorMessage(e.code);
     } catch (e) {
-      print('Apple Sign-In error: $e');
+      debugPrint('Apple Sign-In error: $e');
       return 'Apple Sign-In failed: ${e.toString()}';
     }
   }

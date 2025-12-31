@@ -27,17 +27,17 @@ class StatusBadge extends StatelessWidget {
   Color _getBackgroundColor() {
     switch (status) {
       case ItemStatus.available:
-        return AppTheme.success.withOpacity(0.1);
+        return AppTheme.success.withValues(alpha: 0.1);
       case ItemStatus.requested:
-        return AppTheme.warning.withOpacity(0.1);
+        return AppTheme.warning.withValues(alpha: 0.1);
       case ItemStatus.approved:
-        return AppTheme.primary.withOpacity(0.1);
+        return AppTheme.primary.withValues(alpha: 0.1);
       case ItemStatus.active:
-        return AppTheme.primaryPressed.withOpacity(0.1);
+        return AppTheme.primaryPressed.withValues(alpha: 0.1);
       case ItemStatus.returned:
-        return AppTheme.textSecondary.withOpacity(0.1);
+        return AppTheme.textSecondary.withValues(alpha: 0.1);
       case ItemStatus.settled:
-        return AppTheme.primaryHover.withOpacity(0.1);
+        return AppTheme.primaryHover.withValues(alpha: 0.1);
     }
   }
 
@@ -65,7 +65,7 @@ class StatusBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: _getBackgroundColor(),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _getColor().withOpacity(0.5)),
+        border: Border.all(color: _getColor().withValues(alpha: 0.5)),
       ),
       child: Text(
         _getText(),

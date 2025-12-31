@@ -178,8 +178,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onChanged: _updatePasswordValidation,
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Password required';
-                      if (!_isPasswordValid)
+                      if (!_isPasswordValid) {
                         return 'Password does not meet requirements';
+                      }
                       return null;
                     },
                   ),
@@ -269,7 +270,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               )
             : null,
         filled: true,
-        fillColor: Colors.teal.shade50.withOpacity(0.3),
+        fillColor: Colors.teal.shade50.withValues(alpha: 0.3),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,

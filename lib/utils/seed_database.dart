@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/item.dart';
 
 /// Utility to seed the Firestore database with sample items
@@ -167,7 +168,7 @@ class SeedDatabase {
     }
     
     await batch.commit();
-    print('✅ Database seeded with ${sampleItems.length} items');
+    debugPrint('✅ Database seeded with ${sampleItems.length} items');
   }
 
   /// Clear all items from the database
@@ -180,7 +181,7 @@ class SeedDatabase {
     }
     
     await batch.commit();
-    print('🗑️ All items cleared from database');
+    debugPrint('🗑️ All items cleared from database');
   }
 
   /// Seed items for a specific user (use actual Firebase UID)
@@ -215,11 +216,11 @@ class SeedDatabase {
 
     final batch = _firestore.batch();
     for (final item in userItems) {
-      final docRef = _itemsCollection.doc(item['id']);
+      final docRef = _itemsCollection.doc(item['id'] as String?);
       batch.set(docRef, item);
     }
     
     await batch.commit();
-    print('✅ Added ${userItems.length} items for user: $userId');
+    debugPrint('✅ Added ${userItems.length} items for user: $userId');
   }
 }

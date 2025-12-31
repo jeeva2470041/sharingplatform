@@ -1,7 +1,7 @@
-import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import '../models/item.dart';
 import 'transaction_service.dart';
 
@@ -56,7 +56,7 @@ class ItemService {
       }
     } catch (e) {
       // Ignore errors if folder doesn't exist
-      print('Error deleting item images: $e');
+      debugPrint('Error deleting item images: $e');
     }
   }
 

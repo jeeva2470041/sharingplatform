@@ -272,11 +272,11 @@ class _PostItemScreenState extends State<PostItemScreen> {
                                     'New',
                                     style: TextStyle(color: AppTheme.primary),
                                   ),
-                                  backgroundColor: AppTheme.primary.withOpacity(0.1),
+                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(20),
                                     side: BorderSide(
-                                      color: AppTheme.primary.withOpacity(0.5),
+                                      color: AppTheme.primary.withValues(alpha: 0.5),
                                     ),
                                   ),
                                   onPressed: _addCategory,
@@ -321,7 +321,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -333,7 +333,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                           width: 56,
                           height: 56,
                           decoration: BoxDecoration(
-                            color: AppTheme.primary.withOpacity(0.1),
+                            color: AppTheme.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -390,10 +390,10 @@ class _PostItemScreenState extends State<PostItemScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: AppTheme.success.withOpacity(0.1),
+                            color: AppTheme.success.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: AppTheme.success.withOpacity(0.3),
+                              color: AppTheme.success.withValues(alpha: 0.3),
                             ),
                           ),
                           child: const Text(
@@ -418,7 +418,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     offset: const Offset(0, -4),
                     blurRadius: 16,
                   ),
@@ -432,7 +432,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppTheme.primary.withOpacity(0.5),
+                    disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.5),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),

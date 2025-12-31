@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -203,7 +202,7 @@ class _QrScannerDialogState extends State<QrScannerDialog>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [widget.accentColor, widget.accentColor.withOpacity(0.8)],
+          colors: [widget.accentColor, widget.accentColor.withValues(alpha: 0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -234,7 +233,7 @@ class _QrScannerDialogState extends State<QrScannerDialog>
                   style: TextStyle(
                     fontFamily: AppTheme.fontFamily,
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ],
@@ -357,7 +356,7 @@ class _QrScannerDialogState extends State<QrScannerDialog>
             width: 220,
             height: 220,
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Stack(
@@ -565,7 +564,7 @@ class _QrScannerDialogState extends State<QrScannerDialog>
             Icon(
               Icons.keyboard_alt_outlined,
               size: 64,
-              color: widget.accentColor.withOpacity(0.7),
+              color: widget.accentColor.withValues(alpha: 0.7),
             ),
             const SizedBox(height: 16),
             const Text(
