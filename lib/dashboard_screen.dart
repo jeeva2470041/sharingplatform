@@ -15,6 +15,7 @@ import 'widgets/notification_dropdown.dart';
 import 'services/auth_service.dart';
 import 'services/item_service.dart';
 import 'services/transaction_service.dart';
+import 'services/profile_service.dart';
 import 'app_theme.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -929,7 +930,7 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
     }
   }
 
-  void _openChat() {
+  Future<void> _openChat() async {
     final otherUserId = widget.isOwner
         ? (widget.item.borrowerId ?? 'unknown')
         : widget.item.ownerId;
@@ -942,10 +943,21 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
     }
 
     // Determine the other user's name based on role
-    final otherUserName = widget.isOwner 
-        ? 'Borrower' // When owner, other user is borrower
-        : (widget.item.ownerName ?? 'Lender'); // When borrower, other user is owner
+    String otherUserName;
+    if (widget.isOwner) {
+      // When owner, other user is borrower - fetch their actual name
+      try {
+        final borrowerProfile = await ProfileService.getProfileForUser(otherUserId);
+        otherUserName = borrowerProfile?.fullName ?? 'Borrower';
+      } catch (e) {
+        otherUserName = 'Borrower';
+      }
+    } else {
+      // When borrower, other user is owner - use stored name
+      otherUserName = widget.item.ownerName ?? 'Lender';
+    }
 
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(

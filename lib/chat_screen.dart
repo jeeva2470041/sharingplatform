@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'app_theme.dart';
+import 'widgets/user_profile_info_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   final String itemId; // CRITICAL: Chat is item-specific
@@ -50,6 +51,9 @@ class _ChatScreenState extends State<ChatScreen> {
         .orderBy('timestamp', descending: true)
         .snapshots(includeMetadataChanges: true);
 
+    // Register this user as a participant in the chat
+    _registerParticipant();
+
     // Debug: Print chatId to verify
     debugPrint('=== CHAT DEBUG ===');
     debugPrint('Item ID (Chat ID): $_chatId');
@@ -57,6 +61,66 @@ class _ChatScreenState extends State<ChatScreen> {
     debugPrint('Other User ID: ${widget.otherUserId}');
     debugPrint('Firestore Path: chats/$_chatId/messages');
     debugPrint('==================');
+  }
+
+  /// Register this user as a participant in the chat document
+  /// Also saves user names for faster notification display
+  Future<void> _registerParticipant() async {
+    try {
+      // Fetch current user's name from profiles collection
+      String currentUserName = 'User';
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('profiles')
+            .doc(_currentUserId)
+            .get();
+        if (userDoc.exists) {
+          currentUserName = userDoc.data()?['fullName'] as String? ?? 'User';
+        }
+      } catch (e) {
+        debugPrint('Failed to fetch current user name: $e');
+      }
+
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_chatId)
+          .set({
+            'participantIds': [_currentUserId, widget.otherUserId], // For efficient querying
+            'participants': {
+              _currentUserId: {
+                'userId': _currentUserId,
+                'name': currentUserName,
+                'joinedAt': FieldValue.serverTimestamp(),
+              },
+              widget.otherUserId: {
+                'userId': widget.otherUserId,
+                'name': widget.otherUserName,
+              },
+            },
+            'itemId': widget.itemId,
+            'itemName': widget.itemName,
+          }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Failed to register participant: $e');
+    }
+  }
+
+  /// Update last read timestamp when leaving chat
+  Future<void> _updateLastReadTimestamp() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_chatId)
+          .set({
+            'participants': {
+              _currentUserId: {
+                'lastReadTimestamp': FieldValue.serverTimestamp(),
+              },
+            },
+          }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Failed to update last read timestamp: $e');
+    }
   }
 
   /// Send message - writes to SAME chat document
@@ -95,6 +159,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // Update last read timestamp when leaving chat - ensures messages viewed are marked as read
+    _updateLastReadTimestamp();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -105,43 +171,64 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Colors.white24,
-              radius: 16,
-              child: Text(
-                widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.otherUserName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-                    overflow: TextOverflow.ellipsis,
+        title: InkWell(
+          onTap: () {
+            UserProfileInfoDialog.show(
+              context,
+              userId: widget.otherUserId,
+              title: '${widget.otherUserName} Profile',
+            );
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white24,
+                  radius: 16,
+                  child: Text(
+                    widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  Row(
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.inventory_2_outlined, size: 12, color: Colors.white70),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          widget.itemName,
-                          style: const TextStyle(fontSize: 12, color: Colors.white70),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.otherUserName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.info_outline, size: 14, color: Colors.white70),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Icon(Icons.inventory_2_outlined, size: 12, color: Colors.white70),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              widget.itemName,
+                              style: const TextStyle(fontSize: 12, color: Colors.white70),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
         flexibleSpace: Container(
           decoration: const BoxDecoration(

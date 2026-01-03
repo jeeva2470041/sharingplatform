@@ -6,6 +6,7 @@ class UserProfile {
   final String userId;
   final String fullName;
   final String department;
+  final String? year; // Academic year (1st Year, 2nd Year, etc.)
   final String contactNumber;
   final String email;
   final String address; // hostel / block / room
@@ -18,6 +19,7 @@ class UserProfile {
     required this.userId,
     required this.fullName,
     required this.department,
+    this.year,
     required this.contactNumber,
     required this.email,
     required this.address,
@@ -30,6 +32,7 @@ class UserProfile {
   bool get hasAllRequiredFields {
     return fullName.trim().isNotEmpty &&
         department.trim().isNotEmpty &&
+        (year?.trim().isNotEmpty ?? false) &&
         contactNumber.trim().isNotEmpty &&
         email.trim().isNotEmpty &&
         address.trim().isNotEmpty;
@@ -42,6 +45,7 @@ class UserProfile {
       userId: userId,
       fullName: '',
       department: '',
+      year: null,
       contactNumber: '',
       email: email,
       address: '',
@@ -55,6 +59,7 @@ class UserProfile {
       'userId': userId,
       'fullName': fullName,
       'department': department,
+      'year': year,
       'contactNumber': contactNumber,
       'email': email,
       'address': address,
@@ -78,6 +83,7 @@ class UserProfile {
       userId: data['userId'] ?? '',
       fullName: data['fullName'] ?? '',
       department: data['department'] ?? '',
+      year: data['year'],
       contactNumber: data['contactNumber'] ?? '',
       email: data['email'] ?? '',
       address: data['address'] ?? '',
@@ -90,6 +96,7 @@ class UserProfile {
   UserProfile copyWith({
     String? fullName,
     String? department,
+    String? year,
     String? contactNumber,
     String? email,
     String? address,
@@ -101,6 +108,7 @@ class UserProfile {
       userId: userId,
       fullName: fullName ?? this.fullName,
       department: department ?? this.department,
+      year: year ?? this.year,
       contactNumber: contactNumber ?? this.contactNumber,
       email: email ?? this.email,
       address: address ?? this.address,

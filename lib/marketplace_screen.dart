@@ -6,6 +6,7 @@ import 'models/transaction.dart';
 import 'widgets/status_badge.dart';
 import 'widgets/rating_dialog.dart';
 import 'widgets/profile_guard.dart';
+import 'widgets/user_profile_info_dialog.dart';
 import 'chat_screen.dart';
 import 'services/item_service.dart';
 import 'services/transaction_service.dart';
@@ -455,27 +456,53 @@ class _ItemCardState extends State<ItemCard> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.person_outline,
-                            size: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              'Lender: ${widget.item.ownerName ?? 'Unknown'}',
-                              style: TextStyle(
-                                color: AppTheme.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
+                      InkWell(
+                        onTap: () {
+                          UserProfileInfoDialog.show(
+                            context,
+                            userId: widget.item.ownerId,
+                            title: 'Lender Info',
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 14,
+                                color: Colors.grey.shade500,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'Lender: ${widget.item.ownerName ?? 'Unknown'}',
+                                  style: TextStyle(
+                                    color: AppTheme.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.info_outline,
+                                  size: 12,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(

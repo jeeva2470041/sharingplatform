@@ -3,7 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'models/transaction.dart';
 import 'services/rating_service.dart';
+import 'services/profile_service.dart';
 import 'widgets/rating_dialog.dart';
+import 'widgets/user_profile_info_dialog.dart';
 import 'app_theme.dart';
 
 // Filter options for transactions
@@ -127,6 +129,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
       for (final doc in lentTransactions.docs) {
         final transaction = LendingTransaction.fromFirestore(doc);
+        // Fetch actual borrower name
+        String borrowerName = 'Borrower';
+        try {
+          final profile = await ProfileService.getProfileForUser(transaction.borrowerId);
+          borrowerName = profile?.fullName ?? 'Borrower';
+        } catch (e) {
+          debugPrint('Failed to fetch borrower name: $e');
+        }
         entries.add(_TransactionEntry(
           type: TransactionType.lent,
           itemName: transaction.itemName,
@@ -139,7 +149,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           isCompleted: transaction.status == TransactionStatus.completed,
           transactionId: transaction.id,
           otherUserId: transaction.borrowerId,
-          otherUserName: 'Borrower',
+          otherUserName: borrowerName,
         ));
       }
 
@@ -151,6 +161,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
       for (final doc in borrowedTransactions.docs) {
         final transaction = LendingTransaction.fromFirestore(doc);
+        // Fetch actual lender name
+        String lenderName = 'Lender';
+        try {
+          final profile = await ProfileService.getProfileForUser(transaction.lenderId);
+          lenderName = profile?.fullName ?? 'Lender';
+        } catch (e) {
+          debugPrint('Failed to fetch lender name: $e');
+        }
         entries.add(_TransactionEntry(
           type: TransactionType.borrowed,
           itemName: transaction.itemName,
@@ -163,7 +181,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           isCompleted: transaction.status == TransactionStatus.completed,
           transactionId: transaction.id,
           otherUserId: transaction.lenderId,
-          otherUserName: 'Lender',
+          otherUserName: lenderName,
         ));
       }
 
@@ -742,6 +760,61 @@ class _TransactionCardState extends State<_TransactionCard> {
                 ),
               ],
             ),
+            // Show borrower/lender name with info button for lent/borrowed transactions
+            if (entry.type != TransactionType.posted && entry.otherUserId != null) ...[              const SizedBox(height: 8),
+              InkWell(
+                onTap: () {
+                  UserProfileInfoDialog.show(
+                    context,
+                    userId: entry.otherUserId!,
+                    title: '${entry.otherUserName} Info',
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        entry.type == TransactionType.lent ? Icons.person_outline : Icons.person,
+                        size: 16,
+                        color: AppTheme.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        entry.type == TransactionType.lent 
+                            ? 'Borrower: ${entry.otherUserName ?? 'Unknown'}'
+                            : 'Lender: ${entry.otherUserName ?? 'Unknown'}',
+                        style: const TextStyle(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.info_outline,
+                          size: 14,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             // Timestamp
             Row(

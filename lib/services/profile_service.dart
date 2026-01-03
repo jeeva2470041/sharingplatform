@@ -53,6 +53,7 @@ class ProfileService {
   static Future<UserProfile> saveProfile({
     required String fullName,
     required String department,
+    required String year,
     required String contactNumber,
     required String email,
     required String address,
@@ -60,6 +61,7 @@ class ProfileService {
     // Validate all fields are filled
     if (fullName.trim().isEmpty ||
         department.trim().isEmpty ||
+        year.trim().isEmpty ||
         contactNumber.trim().isEmpty ||
         email.trim().isEmpty ||
         address.trim().isEmpty) {
@@ -73,6 +75,7 @@ class ProfileService {
       'userId': _currentUserId,
       'fullName': fullName.trim(),
       'department': department.trim(),
+      'year': year.trim(),
       'contactNumber': contactNumber.trim(),
       'email': email.trim(),
       'address': address.trim(),
@@ -90,6 +93,7 @@ class ProfileService {
       userId: _currentUserId,
       fullName: fullName.trim(),
       department: department.trim(),
+      year: year.trim(),
       contactNumber: contactNumber.trim(),
       email: email.trim(),
       address: address.trim(),

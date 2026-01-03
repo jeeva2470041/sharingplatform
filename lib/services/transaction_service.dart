@@ -202,6 +202,53 @@ class TransactionService {
       borrowerId: _currentUserId,
     );
 
+    // Initialize chat document with both lender and borrower as participants
+    // This ensures chat notifications work even before either user opens the chat
+    try {
+      // Fetch user names from profiles collection
+      String borrowerName = 'User';
+      String lenderName = 'User';
+      
+      try {
+        final borrowerDoc = await _firestore.collection('profiles').doc(_currentUserId).get();
+        if (borrowerDoc.exists) {
+          borrowerName = borrowerDoc.data()?['fullName'] as String? ?? 'User';
+        }
+      } catch (e) {
+        debugPrint('Failed to fetch borrower name: $e');
+      }
+      
+      try {
+        final lenderDoc = await _firestore.collection('profiles').doc(lenderId).get();
+        if (lenderDoc.exists) {
+          lenderName = lenderDoc.data()?['fullName'] as String? ?? 'User';
+        }
+      } catch (e) {
+        debugPrint('Failed to fetch lender name: $e');
+      }
+
+      await _firestore.collection('chats').doc(itemId).set({
+        'participantIds': [_currentUserId, lenderId], // For efficient querying
+        'participants': {
+          _currentUserId: {
+            'userId': _currentUserId,
+            'name': borrowerName,
+            'joinedAt': FieldValue.serverTimestamp(),
+          },
+          lenderId: {
+            'userId': lenderId,
+            'name': lenderName,
+            'joinedAt': FieldValue.serverTimestamp(),
+          },
+        },
+        'itemId': itemId,
+        'itemName': itemName,
+      }, SetOptions(merge: true));
+      debugPrint('✅ Chat initialized for item $itemId with names: $borrowerName, $lenderName');
+    } catch (e) {
+      debugPrint('Failed to initialize chat: $e');
+    }
+
     return transaction;
   }
 

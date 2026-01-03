@@ -24,6 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Only Department uses dropdown
   String? _selectedDepartment;
+  String? _selectedYear;
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -44,6 +45,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'Cyber Security',
     'Aerospace Engineering',
     'Other',
+  ];
+
+  // Academic year options
+  static const List<String> years = [
+    '1st Year',
+    '2nd Year',
+    '3rd Year',
+    '4th Year',
+    '5th Year',
+    'PG/PhD',
+    'Faculty/Staff',
   ];
 
   @override
@@ -76,6 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _profile = profile;
         _fullNameController.text = profile.fullName;
         _selectedDepartment = profile.department.isEmpty ? null : profile.department;
+        _selectedYear = profile.year?.isEmpty ?? true ? null : profile.year;
         _contactController.text = profile.contactNumber;
         _emailController.text = registeredEmail; // Use Firebase Auth email
         _addressController.text = profile.address;
@@ -98,6 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await ProfileService.saveProfile(
         fullName: _fullNameController.text.trim(),
         department: _selectedDepartment ?? '',
+        year: _selectedYear ?? '',
         contactNumber: _contactController.text.trim(),
         email: _emailController.text.trim(),
         address: _addressController.text.trim(),
@@ -292,6 +306,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               setState(() => _selectedDepartment = value);
             },
             validator: (value) => value == null ? 'Department is required' : null,
+          ),
+          const SizedBox(height: AppTheme.spacing16),
+
+          // Year - Dropdown
+          DropdownButtonFormField<String>(
+            value: _selectedYear,
+            decoration: AppTheme.inputDecoration(
+              label: 'Year *',
+              hint: 'Select your year',
+              prefixIcon: const Icon(Icons.calendar_today, color: AppTheme.textSecondary),
+            ),
+            items: years.map((year) {
+              return DropdownMenuItem(value: year, child: Text(year));
+            }).toList(),
+            onChanged: (value) {
+              setState(() => _selectedYear = value);
+            },
+            validator: (value) => value == null ? 'Year is required' : null,
           ),
           const SizedBox(height: AppTheme.spacing16),
 
