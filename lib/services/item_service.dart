@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import '../models/item.dart';
 import 'transaction_service.dart';
+import 'item_request_service.dart';
 
 /// Service for managing items in Firestore
 /// All items are stored in a shared 'items' collection
@@ -191,6 +192,7 @@ class ItemService {
   }
 
   /// Return an item
+  /// Also reactivates any paused requests from the queue
   static Future<void> returnItem(
     String itemId, {
     double? newRating,
@@ -199,6 +201,7 @@ class ItemService {
     final updates = <String, dynamic>{
       'status': ItemStatus.available.index,
       'borrowerId': null,
+      'requestCount': 0, // Reset initially, will be updated if there are paused requests
     };
     if (newRating != null) {
       updates['rating'] = newRating;
@@ -207,6 +210,11 @@ class ItemService {
       updates['ratingCount'] = newRatingCount;
     }
     await _itemsCollection.doc(itemId).update(updates);
+    
+    // Reactivate any paused requests (people who were in queue)
+    // This will update item status back to 'requested' if there are reactivated requests
+    final reactivatedCount = await ItemRequestService.reactivatePausedRequests(itemId);
+    debugPrint('📋 Return complete. Reactivated $reactivatedCount queued requests.');
   }
 
   /// Settle an item (for damaged/kept)

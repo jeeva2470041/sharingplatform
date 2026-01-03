@@ -7,6 +7,7 @@ enum ItemRequestStatus {
   rejected,  // Lender rejected this request
   expired,   // Request expired (after 2 days)
   cancelled, // Requester cancelled the request
+  paused,    // Paused while item is lent to someone else (will reactivate on return)
 }
 
 /// Model for tracking multiple requests per item
@@ -80,6 +81,8 @@ class ItemRequest {
         return 'Expired';
       case ItemRequestStatus.cancelled:
         return 'Cancelled';
+      case ItemRequestStatus.paused:
+        return 'In Queue';
     }
   }
 

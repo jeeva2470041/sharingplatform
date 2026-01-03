@@ -144,14 +144,9 @@ class ItemRequestService {
     required String requestId,
     required String itemId,
   }) async {
-    // Get all other pending requests BEFORE the transaction (can't query inside transaction)
-    final otherRequests = await _requestsCollection
-        .where('itemId', isEqualTo: itemId)
-        .where('status', isEqualTo: ItemRequestStatus.pending.index)
-        .get();
-    
-    return await _firestore.runTransaction<ItemRequest>((transaction) async {
-      // Step 1: Read item document
+    // Step 1: Use transaction for the critical operations (approve + update item)
+    final result = await _firestore.runTransaction<Map<String, dynamic>>((transaction) async {
+      // Read item document
       final itemDoc = await transaction.get(_itemsCollection.doc(itemId));
       
       if (!itemDoc.exists) {
@@ -165,7 +160,7 @@ class ItemRequestService {
       final currentStatus = ItemStatus.values[itemData['status'] ?? 0];
       final currentVersion = itemData['version'] ?? 0;
       
-      // Step 2: Validate item is still in requested state
+      // Validate item is still in requested state
       if (currentStatus != ItemStatus.requested) {
         throw RequestConflictException(
           'Item state has changed. Please refresh and try again.',
@@ -173,7 +168,7 @@ class ItemRequestService {
         );
       }
       
-      // Step 3: Read the request to approve
+      // Read the request to approve
       final requestDoc = await transaction.get(_requestsCollection.doc(requestId));
       
       if (!requestDoc.exists) {
@@ -199,34 +194,60 @@ class ItemRequestService {
         );
       }
       
-      // Step 4: Approve the selected request
+      // Approve the selected request
       transaction.update(_requestsCollection.doc(requestId), {
         'status': ItemRequestStatus.approved.index,
       });
       
-      // Step 5: Reject all other pending requests
-      for (final doc in otherRequests.docs) {
-        if (doc.id != requestId) {
-          transaction.update(_requestsCollection.doc(doc.id), {
-            'status': ItemRequestStatus.rejected.index,
-            'rejectionReason': 'Another request was approved',
-          });
-        }
-      }
-      
-      // Step 6: Update item - set approved status, set borrower, reset count, increment version
+      // Update item - set approved status, set borrower
       transaction.update(_itemsCollection.doc(itemId), {
         'status': ItemStatus.approved.index,
         'borrowerId': request.requesterId,
-        'requestCount': 0,
         'version': currentVersion + 1,
       });
       
-      debugPrint('✅ Request $requestId approved for item $itemId');
-      debugPrint('   ${otherRequests.docs.length - 1} other requests rejected');
-      
-      return request.copyWith(status: ItemRequestStatus.approved);
+      return {
+        'request': request,
+        'requesterId': request.requesterId,
+      };
     });
+    
+    final approvedRequest = result['request'] as ItemRequest;
+    
+    // Step 2: Pause other pending requests using batch (outside transaction)
+    final otherRequests = await _requestsCollection
+        .where('itemId', isEqualTo: itemId)
+        .where('status', isEqualTo: ItemRequestStatus.pending.index)
+        .get();
+    
+    if (otherRequests.docs.isNotEmpty) {
+      final batch = _firestore.batch();
+      int pausedCount = 0;
+      
+      for (final doc in otherRequests.docs) {
+        if (doc.id != requestId) {
+          batch.update(_requestsCollection.doc(doc.id), {
+            'status': ItemRequestStatus.paused.index,
+          });
+          pausedCount++;
+        }
+      }
+      
+      if (pausedCount > 0) {
+        await batch.commit();
+        
+        // Update item's paused count
+        await _itemsCollection.doc(itemId).update({
+          'requestCount': pausedCount,
+        });
+        
+        debugPrint('✅ $pausedCount other requests paused (will reactivate on return)');
+      }
+    }
+    
+    debugPrint('✅ Request $requestId approved for item $itemId');
+    
+    return approvedRequest.copyWith(status: ItemRequestStatus.approved);
   }
 
   /// Reject a specific request
@@ -450,5 +471,61 @@ class ItemRequestService {
         .get();
     
     return requests.docs.isNotEmpty;
+  }
+
+  /// Reactivate paused requests when an item is returned
+  /// Called after item return to allow queued users to be considered again
+  static Future<int> reactivatePausedRequests(String itemId) async {
+    // Get all paused requests for this item
+    final pausedRequests = await _requestsCollection
+        .where('itemId', isEqualTo: itemId)
+        .where('status', isEqualTo: ItemRequestStatus.paused.index)
+        .get();
+    
+    if (pausedRequests.docs.isEmpty) {
+      debugPrint('📭 No paused requests to reactivate for item $itemId');
+      return 0;
+    }
+    
+    int reactivatedCount = 0;
+    int expiredCount = 0;
+    
+    final batch = _firestore.batch();
+    
+    for (final doc in pausedRequests.docs) {
+      final request = ItemRequest.fromFirestore(doc);
+      
+      // Check if the request has expired while paused
+      if (request.isExpired) {
+        batch.update(_requestsCollection.doc(doc.id), {
+          'status': ItemRequestStatus.expired.index,
+        });
+        expiredCount++;
+      } else {
+        // Reactivate the request
+        batch.update(_requestsCollection.doc(doc.id), {
+          'status': ItemRequestStatus.pending.index,
+        });
+        reactivatedCount++;
+      }
+    }
+    
+    // Commit all updates
+    await batch.commit();
+    
+    // Update item status and request count if there are reactivated requests
+    if (reactivatedCount > 0) {
+      await _itemsCollection.doc(itemId).update({
+        'status': ItemStatus.requested.index,
+        'requestCount': reactivatedCount,
+      });
+      debugPrint('✅ Reactivated $reactivatedCount paused requests for item $itemId');
+    }
+    
+    if (expiredCount > 0) {
+      debugPrint('⏰ $expiredCount requests expired while paused');
+    }
+    
+    return reactivatedCount;
   }
 }
