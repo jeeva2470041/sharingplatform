@@ -87,8 +87,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _profile = profile;
         _fullNameController.text = profile.fullName;
-        _selectedDepartment = profile.department.isEmpty ? null : profile.department;
-        _selectedYear = profile.year?.isEmpty ?? true ? null : profile.year;
+        
+        // Safely set department - must match one of the dropdown items
+        final dept = profile.department;
+        if (dept.isNotEmpty && departments.contains(dept)) {
+          _selectedDepartment = dept;
+        } else {
+          // Map common abbreviations to full names
+          switch (dept.toLowerCase()) {
+            case 'cse':
+              _selectedDepartment = 'Computer Science and Engineering';
+              break;
+            case 'it':
+              _selectedDepartment = 'Information Technology';
+              break;
+            case 'ece':
+              _selectedDepartment = 'Electronics and Communication Engineering';
+              break;
+            case 'eee':
+              _selectedDepartment = 'Electrical and Electronics Engineering';
+              break;
+            case 'me':
+              _selectedDepartment = 'Mechanical Engineering';
+              break;
+            case 'ce':
+              _selectedDepartment = 'Civil Engineering';
+              break;
+            default:
+              _selectedDepartment = null;
+          }
+        }
+
+        // Safely set year - must match one of the dropdown items
+        final year = profile.year;
+        if (year != null && year.isNotEmpty && years.contains(year)) {
+          _selectedYear = year;
+        } else {
+          _selectedYear = null;
+        }
+
         _contactController.text = profile.contactNumber;
         _emailController.text = registeredEmail; // Use Firebase Auth email
         _addressController.text = profile.address;
@@ -311,7 +348,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           // Year - Dropdown
           DropdownButtonFormField<String>(
-            value: _selectedYear,
+            initialValue: _selectedYear,
             decoration: AppTheme.inputDecoration(
               label: 'Year *',
               hint: 'Select your year',
