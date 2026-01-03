@@ -9,13 +9,19 @@ import 'profile_screen.dart';
 import 'transactions_screen.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
+import 'models/item_request.dart';
 import 'widgets/status_badge.dart';
 import 'widgets/profile_guard.dart';
 import 'widgets/notification_dropdown.dart';
 import 'services/auth_service.dart';
 import 'services/item_service.dart';
+import 'services/item_request_service.dart';
 import 'services/transaction_service.dart';
 import 'services/profile_service.dart';
+import 'services/rating_service.dart';
+import 'models/user_profile.dart';
+import 'models/user_rating.dart';
+import 'widgets/user_profile_info_dialog.dart';
 import 'app_theme.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -687,6 +693,11 @@ class _ActivityItemCard extends StatefulWidget {
 class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerProviderStateMixin {
   late AnimationController _highlightController;
   late Animation<double> _highlightAnimation;
+  
+  // Borrower info for pending requests
+  UserProfile? _borrowerProfile;
+  UserTrustScore? _borrowerTrustScore;
+  bool _isLoadingBorrowerInfo = false;
 
   @override
   void initState() {
@@ -705,6 +716,36 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
     
     if (widget.highlight) {
       _highlightController.forward();
+    }
+    
+    // Load borrower info if this is a pending request
+    if (widget.isOwner && widget.item.status == ItemStatus.requested && widget.item.borrowerId != null) {
+      _loadBorrowerInfo();
+    }
+  }
+  
+  Future<void> _loadBorrowerInfo() async {
+    if (_isLoadingBorrowerInfo || widget.item.borrowerId == null) return;
+    
+    setState(() => _isLoadingBorrowerInfo = true);
+    
+    try {
+      final results = await Future.wait([
+        ProfileService.getProfileForUser(widget.item.borrowerId!),
+        RatingService.getTrustScore(widget.item.borrowerId!),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _borrowerProfile = results[0] as UserProfile?;
+          _borrowerTrustScore = results[1] as UserTrustScore;
+          _isLoadingBorrowerInfo = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingBorrowerInfo = false);
+      }
     }
   }
 
@@ -735,55 +776,52 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
   }
 
   Future<void> _approveRequest() async {
-    try {
-      final transaction = await TransactionService.getTransactionForItem(
-        widget.item.id,
-      );
-      if (transaction != null) {
-        await TransactionService.approveRequest(transaction.id);
-      } else {
-        await ItemService.approveRequest(widget.item.id);
-      }
+    // Open the request queue dialog to choose which request to approve
+    _showRequestQueueDialog();
+  }
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Request approved! You can now generate QR for handover.'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to approve: $e'), backgroundColor: AppTheme.danger),
-      );
-    }
+  /// Show dialog with all pending requests for this item
+  void _showRequestQueueDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _RequestQueueSheet(
+        item: widget.item,
+        onRequestApproved: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Request approved! You can now generate QR for handover.'),
+                backgroundColor: AppTheme.success,
+              ),
+            );
+          }
+        },
+        onRequestRejected: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Request rejected'),
+                backgroundColor: AppTheme.warning,
+              ),
+            );
+          }
+        },
+        onError: (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(error), backgroundColor: AppTheme.danger),
+            );
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _rejectRequest() async {
-    try {
-      final transaction = await TransactionService.getTransactionForItem(
-        widget.item.id,
-      );
-      if (transaction != null) {
-        await TransactionService.rejectRequest(transaction.id);
-      } else {
-        await ItemService.rejectRequest(widget.item.id);
-      }
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Request rejected'),
-          backgroundColor: AppTheme.danger,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to reject: $e'), backgroundColor: AppTheme.danger),
-      );
-    }
+    // Open the request queue dialog to reject requests
+    _showRequestQueueDialog();
   }
 
   /// Settlement for damaged/kept items - transfers deposit from borrower to lender
@@ -1070,105 +1108,232 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
     }
   }
 
-  void _showReviewDialog() {
+  /// Legacy review dialog for single request - kept for backward compatibility
+  /// @deprecated Use _showRequestQueueDialog for multi-request system
+  // ignore: unused_element
+  void _showReviewDialog() async {
+    // Fetch borrower profile
+    final borrowerId = widget.item.borrowerId;
+    if (borrowerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to identify requester'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+      return;
+    }
+
+    final profile = await ProfileService.getProfileForUser(borrowerId);
+    
+    if (!mounted) return;
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.cardRadius)),
-        title: Column(
+        titlePadding: EdgeInsets.zero,
+        title: Stack(
           children: [
-            const Icon(Icons.inventory_2_outlined, size: 48, color: AppTheme.primary),
-            const SizedBox(height: AppTheme.spacing16),
-            const Text(
-              'Review Request',
-              textAlign: TextAlign.center,
-              style: AppTheme.cardHeader,
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'A user wants to borrow this item.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.fontFamily,
-                color: AppTheme.textSecondary,
-                fontSize: AppTheme.fontSizeBody,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing24),
-            Container(
-              padding: const EdgeInsets.all(AppTheme.spacing12),
-              decoration: BoxDecoration(
-                color: AppTheme.background,
-                borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-              ),
-              child: Row(
+            // Main title content
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              child: Column(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppTheme.cardBackground,
-                      borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
-                    ),
-                    child: Icon(
-                      _categoryIcon(widget.item.category),
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: AppTheme.spacing12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.item.name,
-                          style: AppTheme.labelText.copyWith(fontWeight: AppTheme.fontWeightSemibold),
-                        ),
-                        Text(
-                          'Deposit: ₹${widget.item.deposit}',
-                          style: const TextStyle(
-                            fontFamily: AppTheme.fontFamily,
-                            color: AppTheme.textSecondary,
-                            fontSize: AppTheme.fontSizeHelper,
-                          ),
-                        ),
-                      ],
-                    ),
+                  const Icon(Icons.inventory_2_outlined, size: 48, color: AppTheme.primary),
+                  const SizedBox(height: AppTheme.spacing16),
+                  const Text(
+                    'Review Request',
+                    textAlign: TextAlign.center,
+                    style: AppTheme.cardHeader,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: AppTheme.spacing24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _rejectRequest();
-                    },
-                    style: AppTheme.dangerOutlinedButtonStyle,
-                    child: const Text('Reject'),
-                  ),
-                ),
-                const SizedBox(width: AppTheme.spacing16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _approveRequest();
-                    },
-                    style: AppTheme.successButtonStyle,
-                    child: const Text('Approve'),
-                  ),
-                ),
-              ],
+            // Close button
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                icon: const Icon(Icons.close),
+                color: AppTheme.textSecondary,
+                iconSize: 22,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                splashRadius: 20,
+              ),
             ),
           ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Requester Info Section
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppTheme.spacing16),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                          child: Text(
+                            profile?.fullName.isNotEmpty == true
+                                ? profile!.fullName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppTheme.spacing12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                profile?.fullName ?? 'Unknown User',
+                                style: AppTheme.sectionTitle,
+                              ),
+                              if (profile?.department != null && profile!.department.isNotEmpty)
+                                Text(
+                                  profile.department,
+                                  style: const TextStyle(
+                                    fontFamily: AppTheme.fontFamily,
+                                    color: AppTheme.textSecondary,
+                                    fontSize: AppTheme.fontSizeHelper,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (profile?.contactNumber != null && profile!.contactNumber.isNotEmpty) ...[
+                      const SizedBox(height: AppTheme.spacing12),
+                      Row(
+                        children: [
+                          Icon(Icons.phone, size: 16, color: AppTheme.textSecondary),
+                          const SizedBox(width: AppTheme.spacing8),
+                          Text(
+                            profile.contactNumber,
+                            style: const TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              color: AppTheme.textPrimary,
+                              fontSize: AppTheme.fontSizeLabel,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: AppTheme.spacing12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          UserProfileInfoDialog.show(
+                            dialogContext,
+                            userId: borrowerId,
+                            title: 'Requester Profile',
+                          );
+                        },
+                        icon: const Icon(Icons.person_outline, size: 18),
+                        label: const Text('View Full Profile'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                          padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppTheme.spacing16),
+              // Item Info Section
+              Container(
+                padding: const EdgeInsets.all(AppTheme.spacing12),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardBackground,
+                        borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                      ),
+                      child: Icon(
+                        _categoryIcon(widget.item.category),
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacing12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.item.name,
+                            style: AppTheme.labelText.copyWith(fontWeight: AppTheme.fontWeightSemibold),
+                          ),
+                          Text(
+                            'Deposit: ₹${widget.item.deposit}',
+                            style: const TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              color: AppTheme.textSecondary,
+                              fontSize: AppTheme.fontSizeHelper,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppTheme.spacing24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(dialogContext);
+                        _rejectRequest();
+                      },
+                      style: AppTheme.dangerOutlinedButtonStyle,
+                      child: const Text('Reject'),
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.spacing16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(dialogContext);
+                        _approveRequest();
+                      },
+                      style: AppTheme.successButtonStyle,
+                      child: const Text('Approve'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1334,7 +1499,97 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
                         ),
                       if (!isApproved) ...[
                         const SizedBox(height: AppTheme.spacing8),
-                        StatusBadge(status: widget.item.status),
+                        // Status badge with requester info below for pending requests
+                        if (widget.item.status == ItemStatus.requested && widget.isOwner) ...[
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              StatusBadge(status: widget.item.status),
+                              const SizedBox(height: AppTheme.spacing8),
+                              // Requester info below
+                              if (_isLoadingBorrowerInfo)
+                                SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: () {
+                                    if (widget.item.borrowerId != null) {
+                                      UserProfileInfoDialog.show(
+                                        context,
+                                        userId: widget.item.borrowerId!,
+                                        title: 'Requester Profile',
+                                      );
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 10,
+                                          backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                          child: Text(
+                                            _borrowerProfile?.fullName.isNotEmpty == true
+                                                ? _borrowerProfile!.fullName[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.primary,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _borrowerProfile?.fullName ?? '...',
+                                          style: const TextStyle(
+                                            fontFamily: AppTheme.fontFamily,
+                                            fontWeight: AppTheme.fontWeightSemibold,
+                                            fontSize: 12,
+                                            color: AppTheme.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        if (_borrowerTrustScore != null && _borrowerTrustScore!.totalRatings > 0) ...[
+                                          Icon(Icons.star, size: 12, color: Colors.amber.shade600),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            '${_borrowerTrustScore!.overallRating.toStringAsFixed(1)} (${_borrowerTrustScore!.totalRatings})',
+                                            style: TextStyle(
+                                              fontFamily: AppTheme.fontFamily,
+                                              fontSize: 11,
+                                              fontWeight: AppTheme.fontWeightMedium,
+                                              color: Colors.amber.shade800,
+                                            ),
+                                          ),
+                                        ] else ...[
+                                          Text(
+                                            'New User',
+                                            style: TextStyle(
+                                              fontFamily: AppTheme.fontFamily,
+                                              fontSize: 11,
+                                              color: Colors.grey.shade500,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ] else ...[
+                          StatusBadge(status: widget.item.status),
+                        ],
                       ],
                     ],
                   ),
@@ -1342,17 +1597,62 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
               ],
             ),
 
-            // Actions for lender when request is pending
+            // Actions for lender when request is pending - show request queue
             if (showRequestActions) ...[
-              const SizedBox(height: AppTheme.spacing16),
-              const Divider(height: 1, color: AppTheme.border),
               const SizedBox(height: AppTheme.spacing12),
+              // Show request count badge
+              if (widget.item.requestCount > 0)
+                Container(
+                  margin: const EdgeInsets.only(bottom: AppTheme.spacing12),
+                  padding: const EdgeInsets.all(AppTheme.spacing12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.people, color: Colors.orange.shade700, size: 20),
+                      const SizedBox(width: AppTheme.spacing8),
+                      Expanded(
+                        child: Text(
+                          '${widget.item.requestCount} pending request${widget.item.requestCount > 1 ? 's' : ''} to review',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            color: Colors.orange.shade800,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${widget.item.requestCount}/${Item.maxRequests}',
+                          style: TextStyle(
+                            color: Colors.orange.shade800,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _showReviewDialog,
+                child: ElevatedButton.icon(
+                  onPressed: _showRequestQueueDialog,
                   style: AppTheme.primaryButtonStyle,
-                  child: const Text('Review Request'),
+                  icon: const Icon(Icons.checklist, size: 20),
+                  label: Text(
+                    widget.item.requestCount > 1 
+                        ? 'Review Requests (${widget.item.requestCount})'
+                        : 'Review Request',
+                  ),
                 ),
               ),
             ],
@@ -1551,6 +1851,779 @@ class _ActivityItemCardState extends State<_ActivityItemCard> with SingleTickerP
         ),
       ),
     ),
+    );
+  }
+}
+/// Bottom sheet showing all pending requests for an item
+/// Allows lender to review and approve/reject requests
+class _RequestQueueSheet extends StatefulWidget {
+  final Item item;
+  final VoidCallback onRequestApproved;
+  final VoidCallback onRequestRejected;
+  final Function(String) onError;
+
+  const _RequestQueueSheet({
+    required this.item,
+    required this.onRequestApproved,
+    required this.onRequestRejected,
+    required this.onError,
+  });
+
+  @override
+  State<_RequestQueueSheet> createState() => _RequestQueueSheetState();
+}
+
+class _RequestQueueSheetState extends State<_RequestQueueSheet> {
+  bool _isProcessing = false;
+  String? _processingRequestId;
+  
+  // For legacy requests (borrowerId on item, no item_requests doc)
+  UserProfile? _legacyRequesterProfile;
+  bool _isLoadingLegacy = true;
+  bool _hasLegacyRequest = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkForLegacyRequest();
+  }
+
+  /// Check if there's a legacy request (borrowerId set but no item_requests)
+  Future<void> _checkForLegacyRequest() async {
+    if (widget.item.borrowerId != null && widget.item.borrowerId!.isNotEmpty) {
+      try {
+        final profile = await ProfileService.getProfileForUser(widget.item.borrowerId!);
+        if (mounted) {
+          setState(() {
+            _legacyRequesterProfile = profile;
+            _hasLegacyRequest = true;
+            _isLoadingLegacy = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _hasLegacyRequest = true;
+            _isLoadingLegacy = false;
+          });
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() => _isLoadingLegacy = false);
+      }
+    }
+  }
+
+  Future<void> _approveRequest(ItemRequest request) async {
+    setState(() {
+      _isProcessing = true;
+      _processingRequestId = request.id;
+    });
+
+    try {
+      await TransactionService.approveRequestFromQueue(
+        requestId: request.id,
+        itemId: widget.item.id,
+        itemName: widget.item.name,
+        lenderId: widget.item.ownerId,
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onRequestApproved();
+      }
+    } on RequestConflictException catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onError(e.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _processingRequestId = null;
+        });
+        widget.onError('Failed to approve: $e');
+      }
+    }
+  }
+
+  /// Approve legacy request (old system with borrowerId on item)
+  Future<void> _approveLegacyRequest() async {
+    setState(() {
+      _isProcessing = true;
+      _processingRequestId = 'legacy';
+    });
+
+    try {
+      // Use the old approval method for legacy requests
+      final transaction = await TransactionService.getTransactionForItem(widget.item.id);
+      if (transaction != null) {
+        await TransactionService.approveRequest(transaction.id);
+      } else {
+        await ItemService.approveRequest(widget.item.id);
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onRequestApproved();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _processingRequestId = null;
+        });
+        widget.onError('Failed to approve: $e');
+      }
+    }
+  }
+
+  Future<void> _rejectRequest(ItemRequest request) async {
+    setState(() {
+      _isProcessing = true;
+      _processingRequestId = request.id;
+    });
+
+    try {
+      await TransactionService.rejectRequestFromQueue(
+        requestId: request.id,
+        itemId: widget.item.id,
+        reason: 'Rejected by lender',
+      );
+
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _processingRequestId = null;
+        });
+        widget.onRequestRejected();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _processingRequestId = null;
+        });
+        widget.onError('Failed to reject: $e');
+      }
+    }
+  }
+
+  /// Reject legacy request (old system)
+  Future<void> _rejectLegacyRequest() async {
+    setState(() {
+      _isProcessing = true;
+      _processingRequestId = 'legacy';
+    });
+
+    try {
+      final transaction = await TransactionService.getTransactionForItem(widget.item.id);
+      if (transaction != null) {
+        await TransactionService.rejectRequest(transaction.id);
+      } else {
+        await ItemService.rejectRequest(widget.item.id);
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onRequestRejected();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _processingRequestId = null;
+        });
+        widget.onError('Failed to reject: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.people_outline, color: AppTheme.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Pending Requests',
+                        style: TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        widget.item.name,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${widget.item.requestCount}/${Item.maxRequests}',
+                    style: TextStyle(
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Requests list
+          Flexible(
+            child: _isLoadingLegacy
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : StreamBuilder<List<ItemRequest>>(
+              stream: ItemRequestService.getRequestsForItem(widget.item.id),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting && !_hasLegacyRequest) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+
+                final newRequests = snapshot.data ?? [];
+                final hasNewRequests = newRequests.isNotEmpty;
+                final hasAnyRequests = hasNewRequests || _hasLegacyRequest;
+
+                if (!hasAnyRequests) {
+                  return Padding(
+                    padding: const EdgeInsets.all(40),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No pending requests',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'All requests may have expired or been processed',
+                          style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                // Combine legacy and new requests for display
+                final totalCount = newRequests.length + (_hasLegacyRequest ? 1 : 0);
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: totalCount,
+                  itemBuilder: (context, index) {
+                    // Show legacy request first if exists
+                    if (_hasLegacyRequest && index == 0) {
+                      final isProcessingThis = _processingRequestId == 'legacy';
+                      return _LegacyRequestCard(
+                        borrowerId: widget.item.borrowerId!,
+                        borrowerProfile: _legacyRequesterProfile,
+                        depositAmount: double.tryParse(widget.item.deposit) ?? 0,
+                        isFirst: true,
+                        isProcessing: isProcessingThis,
+                        disabled: _isProcessing && !isProcessingThis,
+                        onApprove: _approveLegacyRequest,
+                        onReject: _rejectLegacyRequest,
+                      );
+                    }
+
+                    // Show new requests
+                    final requestIndex = _hasLegacyRequest ? index - 1 : index;
+                    final request = newRequests[requestIndex];
+                    final isProcessingThis = _processingRequestId == request.id;
+
+                    return Padding(
+                      padding: index > 0 ? const EdgeInsets.only(top: 12) : EdgeInsets.zero,
+                      child: _RequestCard(
+                        request: request,
+                        isFirst: !_hasLegacyRequest && index == 0,
+                        isProcessing: isProcessingThis,
+                        disabled: _isProcessing && !isProcessingThis,
+                        onApprove: () => _approveRequest(request),
+                        onReject: () => _rejectRequest(request),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          // Info footer
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              border: Border(top: BorderSide(color: Colors.grey.shade200)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Approving a request will automatically reject all others',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Individual request card in the queue
+class _RequestCard extends StatelessWidget {
+  final ItemRequest request;
+  final bool isFirst;
+  final bool isProcessing;
+  final bool disabled;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  const _RequestCard({
+    required this.request,
+    required this.isFirst,
+    required this.isProcessing,
+    required this.disabled,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isFirst ? AppTheme.primary.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isFirst 
+              ? AppTheme.primary.withValues(alpha: 0.3) 
+              : Colors.grey.shade200,
+          width: isFirst ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row with badge
+          Row(
+            children: [
+              if (isFirst)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'FIRST',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: Text(
+                  request.requesterName ?? 'Unknown User',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // Expiry badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: request.timeUntilExpiry.inHours < 12 
+                      ? Colors.red.shade50 
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 12,
+                      color: request.timeUntilExpiry.inHours < 12 
+                          ? Colors.red.shade700 
+                          : Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      request.expiryText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: request.timeUntilExpiry.inHours < 12 
+                            ? Colors.red.shade700 
+                            : Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Request details
+          Row(
+            children: [
+              _DetailChip(
+                icon: Icons.calendar_today_outlined,
+                text: '${request.borrowDurationDays} days',
+              ),
+              const SizedBox(width: 8),
+              _DetailChip(
+                icon: Icons.shield_outlined,
+                text: '₹${request.depositAmount.toStringAsFixed(0)}',
+              ),
+              if (request.requesterEmail != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DetailChip(
+                    icon: Icons.email_outlined,
+                    text: request.requesterEmail!,
+                    expanded: true,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: disabled || isProcessing ? null : onReject,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.danger,
+                    side: const BorderSide(color: AppTheme.danger),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: isProcessing 
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Reject'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: disabled || isProcessing ? null : onApprove,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.success,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: isProcessing 
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Approve'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small detail chip for showing request info
+class _DetailChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool expanded;
+
+  const _DetailChip({
+    required this.icon,
+    required this.text,
+    this.expanded = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Row(
+      mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: Colors.grey.shade600),
+        const SizedBox(width: 4),
+        expanded
+            ? Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              )
+            : Text(
+                text,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+      ],
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: content,
+    );
+  }
+}
+
+/// Legacy request card for old system (borrowerId on item, no item_requests doc)
+class _LegacyRequestCard extends StatelessWidget {
+  final String borrowerId;
+  final UserProfile? borrowerProfile;
+  final double depositAmount;
+  final bool isFirst;
+  final bool isProcessing;
+  final bool disabled;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  const _LegacyRequestCard({
+    required this.borrowerId,
+    this.borrowerProfile,
+    required this.depositAmount,
+    required this.isFirst,
+    required this.isProcessing,
+    required this.disabled,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final requesterName = borrowerProfile?.fullName ?? 'Unknown User';
+    final requesterEmail = borrowerProfile?.email;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isFirst ? AppTheme.primary.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isFirst 
+              ? AppTheme.primary.withValues(alpha: 0.3) 
+              : Colors.grey.shade200,
+          width: isFirst ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row with badge
+          Row(
+            children: [
+              if (isFirst)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'PENDING',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: Text(
+                  requesterName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // View profile button
+              TextButton.icon(
+                onPressed: () {
+                  UserProfileInfoDialog.show(
+                    context,
+                    userId: borrowerId,
+                    title: 'Requester Info',
+                  );
+                },
+                icon: const Icon(Icons.person_outline, size: 16),
+                label: const Text('Profile'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Request details
+          Row(
+            children: [
+              _DetailChip(
+                icon: Icons.shield_outlined,
+                text: '₹${depositAmount.toStringAsFixed(0)} deposit',
+              ),
+              if (requesterEmail != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DetailChip(
+                    icon: Icons.email_outlined,
+                    text: requesterEmail,
+                    expanded: true,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: disabled || isProcessing ? null : onReject,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.danger,
+                    side: const BorderSide(color: AppTheme.danger),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: isProcessing 
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Reject'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: disabled || isProcessing ? null : onApprove,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.success,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: isProcessing 
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Approve'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

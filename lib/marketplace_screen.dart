@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'data/mock_data.dart';
 import 'models/item.dart';
+import 'models/item_request.dart';
 import 'models/transaction.dart';
 import 'widgets/status_badge.dart';
 import 'widgets/rating_dialog.dart';
@@ -9,6 +10,7 @@ import 'widgets/profile_guard.dart';
 import 'widgets/user_profile_info_dialog.dart';
 import 'chat_screen.dart';
 import 'services/item_service.dart';
+import 'services/item_request_service.dart';
 import 'services/transaction_service.dart';
 import 'app_theme.dart';
 
@@ -275,6 +277,7 @@ class _ItemCardState extends State<ItemCard> {
 
     try {
       // Create request using TransactionService - NO CREDITS DEDUCTED
+      // Now uses ItemRequestService with Firestore transactions
       await TransactionService.createRequest(
         itemId: widget.item.id,
         itemName: widget.item.name,
@@ -303,9 +306,11 @@ class _ItemCardState extends State<ItemCard> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Lender will review your request.\nCredits will be locked only after handover.',
-                style: TextStyle(color: Colors.black54),
+              Text(
+                'Your request has been added to the queue.\n'
+                'The lender will review all requests and choose one.\n'
+                'Request expires in ${ItemRequest.expiryDays} days.',
+                style: const TextStyle(color: Colors.black54),
                 textAlign: TextAlign.center,
               ),
               if (depositAmount > 0) ...[
@@ -329,6 +334,42 @@ class _ItemCardState extends State<ItemCard> {
               ),
             ],
           ),
+        ),
+      );
+    } on RequestConflictException catch (e) {
+      if (!mounted) return;
+      
+      // Handle specific conflict errors with appropriate messages
+      String message;
+      Color backgroundColor;
+      
+      switch (e.code) {
+        case 'limit_reached':
+          message = 'This item has reached the maximum number of requests. Please try again later.';
+          backgroundColor = Colors.orange;
+          break;
+        case 'item_unavailable':
+          message = 'This item was just approved for another borrower.';
+          backgroundColor = Colors.red;
+          break;
+        case 'duplicate_request':
+          message = 'You already have a pending request for this item.';
+          backgroundColor = Colors.orange;
+          break;
+        case 'item_deleted':
+          message = 'This item has been removed by the owner.';
+          backgroundColor = Colors.red;
+          break;
+        default:
+          message = e.message;
+          backgroundColor = Colors.red;
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: backgroundColor,
+          duration: const Duration(seconds: 4),
         ),
       );
     } catch (e) {
@@ -400,8 +441,11 @@ class _ItemCardState extends State<ItemCard> {
 
   @override
   Widget build(BuildContext context) {
-    final bool canRequest = widget.item.status == ItemStatus.available;
+    // Check if item can accept requests
+    final bool canAcceptRequests = widget.item.canAcceptRequests;
+    // Check if current user can request (item available/requestable and not own item)
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown';
+    final bool canRequest = canAcceptRequests && widget.item.ownerId != currentUserId;
     final bool canReturn =
         widget.item.status == ItemStatus.approved &&
         widget.item.borrowerId == currentUserId;
@@ -409,6 +453,10 @@ class _ItemCardState extends State<ItemCard> {
         widget.item.borrowerId == currentUserId &&
         (widget.item.status == ItemStatus.requested ||
             widget.item.status == ItemStatus.approved);
+    
+    // Check if user already has a pending request
+    final bool hasExistingRequest = widget.item.status == ItemStatus.requested &&
+        widget.item.borrowerId == currentUserId;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
@@ -430,8 +478,41 @@ class _ItemCardState extends State<ItemCard> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Item image or category icon
-                _buildItemImage(),
+                // Item image or category icon with request count badge
+                Stack(
+                  children: [
+                    _buildItemImage(),
+                    // Show request count badge if there are pending requests
+                    if (widget.item.requestCount > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: widget.item.requestCount >= Item.maxRequests 
+                                ? Colors.red 
+                                : Colors.orange,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            '${widget.item.requestCount}/${Item.maxRequests}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -575,6 +656,7 @@ class _ItemCardState extends State<ItemCard> {
             if (canRequest ||
                 canReturn ||
                 canChat ||
+                hasExistingRequest ||
                 widget.item.status == ItemStatus.requested ||
                 widget.item.status == ItemStatus.approved) ...[
               const SizedBox(height: 16),
@@ -595,9 +677,29 @@ class _ItemCardState extends State<ItemCard> {
                   else
                     const Spacer(),
 
-                  if (canRequest || canReturn)
+                  if (canReturn)
                     ElevatedButton(
-                      onPressed: canRequest ? _requestItem : _returnItem,
+                      onPressed: _returnItem,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 0,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Return Item',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    )
+                  else if (canRequest)
+                    ElevatedButton(
+                      onPressed: _requestItem,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.white,
@@ -611,8 +713,66 @@ class _ItemCardState extends State<ItemCard> {
                         ),
                       ),
                       child: Text(
-                        canRequest ? 'Request Item' : 'Return Item',
+                        widget.item.requestCount > 0 
+                            ? 'Join Queue (${widget.item.requestCount}/${Item.maxRequests})'
+                            : 'Request Item',
                         style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    )
+                  else if (hasExistingRequest)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            size: 16,
+                            color: Colors.blue.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Request Submitted',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (widget.item.requestCount >= Item.maxRequests)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.block,
+                            size: 16,
+                            color: Colors.red.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Queue Full',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade700,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   else if (widget.item.status == ItemStatus.requested)
@@ -625,17 +785,17 @@ class _ItemCardState extends State<ItemCard> {
                         color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.access_time_filled,
                             size: 16,
                             color: Colors.grey,
                           ),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text(
-                            'Request Pending',
-                            style: TextStyle(
+                            '${widget.item.requestCount} Pending',
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.grey,
                             ),

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_rating.dart';
 import '../models/transaction.dart';
 
@@ -140,12 +141,20 @@ class RatingService {
 
   /// Get all ratings for a user
   static Future<List<UserRating>> getUserRatings(String userId) async {
-    final snapshot = await _ratingsCollection
-        .where('ratedTo', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .get();
+    try {
+      // Query without orderBy to avoid needing a composite index
+      final snapshot = await _ratingsCollection
+          .where('ratedTo', isEqualTo: userId)
+          .get();
 
-    return snapshot.docs.map((doc) => UserRating.fromFirestore(doc)).toList();
+      final ratings = snapshot.docs.map((doc) => UserRating.fromFirestore(doc)).toList();
+      // Sort locally by createdAt descending
+      ratings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return ratings;
+    } catch (e) {
+      debugPrint('Error fetching user ratings: $e');
+      return [];
+    }
   }
 
   /// Stream of ratings for a user

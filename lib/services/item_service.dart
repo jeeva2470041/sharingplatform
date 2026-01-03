@@ -71,21 +71,38 @@ class ItemService {
     );
   }
 
-  /// Stream of marketplace items (available items from OTHER users only) - excludes deleted
+  /// Stream of marketplace items (available items OR items with pending requests that can accept more)
+  /// Excludes own items and deleted items
   static Stream<List<Item>> get marketplaceItemsStream {
+    // Query items that are either available or have pending requests (requestCount < 5)
+    // We need to get both available and requested items, then filter
     return _itemsCollection
-        .where('status', isEqualTo: ItemStatus.available.index)
+        .where('isDeleted', isEqualTo: false)
         .snapshots()
         .map((snapshot) {
           final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
           return snapshot.docs
               .map((doc) => Item.fromFirestore(doc))
-              .where(
-                (item) =>
-                    item.ownerId != currentUserId && 
-                    item.ownerId.isNotEmpty &&
-                    !item.isDeleted,
-              )
+              .where((item) {
+                // Exclude own items
+                if (item.ownerId == currentUserId || item.ownerId.isEmpty) {
+                  return false;
+                }
+                // Exclude deleted items
+                if (item.isDeleted) {
+                  return false;
+                }
+                // Include available items
+                if (item.status == ItemStatus.available) {
+                  return true;
+                }
+                // Include requested items that can still accept requests
+                if (item.status == ItemStatus.requested && 
+                    item.requestCount < Item.maxRequests) {
+                  return true;
+                }
+                return false;
+              })
               .toList();
         });
   }

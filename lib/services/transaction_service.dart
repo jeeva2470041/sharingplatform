@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/transaction.dart';
 import '../models/item.dart';
+import '../models/item_request.dart';
 import '../data/mock_data.dart';
 import 'item_service.dart';
+import 'item_request_service.dart';
 
 /// Service for managing the lending workflow with QR verification
 /// Ensures credits are only deducted after physical handover confirmation
@@ -163,9 +165,10 @@ class TransactionService {
     }
   }
 
-  /// Create a new lending request
+  /// Create a new lending request using ItemRequestService
   /// Status: REQUESTED - No credits are deducted at this stage
-  static Future<LendingTransaction?> createRequest({
+  /// Uses Firestore transactions for race condition prevention
+  static Future<ItemRequest> createRequest({
     required String itemId,
     required String itemName,
     required String lenderId,
@@ -177,46 +180,35 @@ class TransactionService {
       throw Exception('Cannot request your own items');
     }
 
-    final transactionId = _transactionsCollection.doc().id;
+    // Get requester info
+    String? requesterName;
+    String? requesterEmail;
+    
+    try {
+      final requesterDoc = await _firestore.collection('profiles').doc(_currentUserId).get();
+      if (requesterDoc.exists) {
+        requesterName = requesterDoc.data()?['fullName'] as String?;
+        requesterEmail = requesterDoc.data()?['email'] as String?;
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch requester info: $e');
+    }
 
-    final transaction = LendingTransaction(
-      id: transactionId,
+    // Create request using transactional ItemRequestService
+    final request = await ItemRequestService.createRequest(
       itemId: itemId,
-      itemName: itemName,
-      lenderId: lenderId,
-      borrowerId: _currentUserId,
+      borrowDurationDays: borrowDurationDays ?? 7,
       depositAmount: depositAmount,
-      status: TransactionStatus.requested,
-      createdAt: DateTime.now(),
-      borrowDurationDays: borrowDurationDays,
-    );
-
-    await _transactionsCollection
-        .doc(transactionId)
-        .set(transaction.toFirestore());
-
-    // Update item status to requested
-    await ItemService.updateItemStatus(
-      itemId,
-      ItemStatus.requested,
-      borrowerId: _currentUserId,
+      requesterName: requesterName,
+      requesterEmail: requesterEmail,
     );
 
     // Initialize chat document with both lender and borrower as participants
     // This ensures chat notifications work even before either user opens the chat
     try {
       // Fetch user names from profiles collection
-      String borrowerName = 'User';
+      String borrowerName = requesterName ?? 'User';
       String lenderName = 'User';
-      
-      try {
-        final borrowerDoc = await _firestore.collection('profiles').doc(_currentUserId).get();
-        if (borrowerDoc.exists) {
-          borrowerName = borrowerDoc.data()?['fullName'] as String? ?? 'User';
-        }
-      } catch (e) {
-        debugPrint('Failed to fetch borrower name: $e');
-      }
       
       try {
         final lenderDoc = await _firestore.collection('profiles').doc(lenderId).get();
@@ -249,13 +241,52 @@ class TransactionService {
       debugPrint('Failed to initialize chat: $e');
     }
 
-    return transaction;
+    return request;
   }
 
   // ========== PHASE 2: APPROVAL (Still no credit deduction) ==========
 
-  /// Lender approves the request
+  /// Lender approves a specific request from the multi-request queue
+  /// Creates a LendingTransaction and uses atomic Firestore transaction
   /// Status: APPROVED - Credits still not deducted, waiting for handover
+  static Future<LendingTransaction> approveRequestFromQueue({
+    required String requestId,
+    required String itemId,
+    required String itemName,
+    required String lenderId,
+  }) async {
+    // Use ItemRequestService for atomic approval (rejects all others)
+    final approvedRequest = await ItemRequestService.approveRequest(
+      requestId: requestId,
+      itemId: itemId,
+    );
+
+    // Create the LendingTransaction for the approved request
+    final transactionId = _transactionsCollection.doc().id;
+
+    final transaction = LendingTransaction(
+      id: transactionId,
+      itemId: itemId,
+      itemName: itemName,
+      lenderId: lenderId,
+      borrowerId: approvedRequest.requesterId,
+      depositAmount: approvedRequest.depositAmount,
+      status: TransactionStatus.approved,
+      createdAt: DateTime.now(),
+      borrowDurationDays: approvedRequest.borrowDurationDays,
+    );
+
+    await _transactionsCollection
+        .doc(transactionId)
+        .set(transaction.toFirestore());
+
+    debugPrint('✅ Created LendingTransaction $transactionId for approved request');
+    
+    return transaction;
+  }
+
+  /// Legacy approve method - still works for existing single-request flow
+  /// @deprecated Use approveRequestFromQueue for new multi-request system
   static Future<void> approveRequest(String transactionId) async {
     final doc = await _transactionsCollection.doc(transactionId).get();
     if (!doc.exists) throw Exception('Transaction not found');
@@ -275,7 +306,21 @@ class TransactionService {
     await ItemService.updateItemStatus(transaction.itemId, ItemStatus.approved);
   }
 
-  /// Lender rejects the request
+  /// Lender rejects a specific request from the queue
+  static Future<void> rejectRequestFromQueue({
+    required String requestId,
+    required String itemId,
+    String? reason,
+  }) async {
+    await ItemRequestService.rejectRequest(
+      requestId: requestId,
+      itemId: itemId,
+      reason: reason,
+    );
+  }
+
+  /// Legacy reject method - still works for existing single-request flow
+  /// @deprecated Use rejectRequestFromQueue for new multi-request system
   static Future<void> rejectRequest(String transactionId) async {
     final doc = await _transactionsCollection.doc(transactionId).get();
     if (!doc.exists) throw Exception('Transaction not found');

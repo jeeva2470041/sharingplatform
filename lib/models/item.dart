@@ -17,6 +17,11 @@ class Item {
   final bool isDeleted; // Soft delete flag
   final DateTime? deletedAt; // When the item was deleted
   final List<String> imageUrls; // Item images stored in Firebase Storage
+  final int version; // Optimistic locking version for race condition prevention
+  final int requestCount; // Number of pending requests (max 5)
+
+  /// Maximum requests allowed per item
+  static const int maxRequests = 5;
 
   Item({
     required this.id,
@@ -33,7 +38,15 @@ class Item {
     this.isDeleted = false,
     this.deletedAt,
     this.imageUrls = const [],
+    this.version = 0,
+    this.requestCount = 0,
   });
+
+  /// Check if item can accept more requests
+  bool get canAcceptRequests => 
+      (status == ItemStatus.available || status == ItemStatus.requested) && 
+      requestCount < maxRequests &&
+      !isDeleted;
 
   String get statusText {
     switch (status) {
@@ -69,6 +82,8 @@ class Item {
       'isDeleted': isDeleted,
       'deletedAt': deletedAt?.toIso8601String(),
       'imageUrls': imageUrls,
+      'version': version,
+      'requestCount': requestCount,
     };
   }
 
@@ -94,6 +109,8 @@ class Item {
       'isDeleted': isDeleted,
       'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
       'imageUrls': imageUrls,
+      'version': version,
+      'requestCount': requestCount,
     };
   }
 
@@ -120,6 +137,8 @@ class Item {
       imageUrls: json['imageUrls'] != null
           ? List<String>.from(json['imageUrls'])
           : [],
+      version: json['version'] ?? 0,
+      requestCount: json['requestCount'] ?? 0,
     );
   }
 
@@ -165,6 +184,8 @@ class Item {
       imageUrls: data['imageUrls'] != null
           ? List<String>.from(data['imageUrls'])
           : [],
+      version: data['version'] ?? 0,
+      requestCount: data['requestCount'] ?? 0,
     );
   }
 
@@ -184,6 +205,8 @@ class Item {
     bool? isDeleted,
     DateTime? deletedAt,
     List<String>? imageUrls,
+    int? version,
+    int? requestCount,
   }) {
     return Item(
       id: id ?? this.id,
@@ -200,6 +223,8 @@ class Item {
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
       imageUrls: imageUrls ?? this.imageUrls,
+      version: version ?? this.version,
+      requestCount: requestCount ?? this.requestCount,
     );
   }
 }
