@@ -1902,6 +1902,18 @@ class _RequestQueueSheetState extends State<_RequestQueueSheet> {
 
   /// Check if there's a legacy request (borrowerId set but no item_requests)
   Future<void> _checkForLegacyRequest() async {
+    // Skip legacy check if using new multi-request system (requestCount > 0)
+    if (widget.item.requestCount > 0) {
+      debugPrint('📋 Item has ${widget.item.requestCount} requests in new system, skipping legacy check');
+      if (mounted) {
+        setState(() {
+          _hasLegacyRequest = false;
+          _isLoadingLegacy = false;
+        });
+      }
+      return;
+    }
+    
     if (widget.item.borrowerId != null && widget.item.borrowerId!.isNotEmpty) {
       try {
         final profile = await ProfileService.getProfileForUser(widget.item.borrowerId!);
@@ -2146,6 +2158,31 @@ class _RequestQueueSheetState extends State<_RequestQueueSheet> {
                 : StreamBuilder<List<ItemRequest>>(
               stream: ItemRequestService.getRequestsForItem(widget.item.id),
               builder: (context, snapshot) {
+                // Show error if any
+                if (snapshot.hasError) {
+                  debugPrint('❌ StreamBuilder error: ${snapshot.error}');
+                  return Padding(
+                    padding: const EdgeInsets.all(40),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Error loading requests',
+                          style: TextStyle(color: Colors.red.shade600),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${snapshot.error}',
+                          style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
                 if (snapshot.connectionState == ConnectionState.waiting && !_hasLegacyRequest) {
                   return const Center(
                     child: Padding(

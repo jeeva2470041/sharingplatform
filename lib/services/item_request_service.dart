@@ -405,17 +405,31 @@ class ItemRequestService {
 
   /// Stream of pending requests for a specific item (for lender's view)
   static Stream<List<ItemRequest>> getRequestsForItem(String itemId) {
+    debugPrint('🔍 Fetching requests for item: $itemId');
+    // Removed orderBy temporarily to debug index issues
     return _requestsCollection
         .where('itemId', isEqualTo: itemId)
         .where('status', isEqualTo: ItemRequestStatus.pending.index)
-        .orderBy('createdAt', descending: false)
         .snapshots()
         .map((snapshot) {
+          debugPrint('📦 Found ${snapshot.docs.length} request documents for item $itemId');
           final requests = snapshot.docs
-              .map((doc) => ItemRequest.fromFirestore(doc))
+              .map((doc) {
+                // debugPrint('  - Request ${doc.id}: status=${doc.data()['status']}, itemId=${doc.data()['itemId']}');
+                return ItemRequest.fromFirestore(doc);
+              })
               .where((r) => !r.isExpired) // Filter out expired (not yet cleaned up)
               .toList();
+          
+          // Sort manually since we removed orderBy
+          requests.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          
+          debugPrint('📋 After filtering expired: ${requests.length} requests');
           return requests;
+        })
+        .handleError((error) {
+          debugPrint('❌ Error fetching requests: $error');
+          return <ItemRequest>[];
         });
   }
 

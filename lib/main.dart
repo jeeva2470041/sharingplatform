@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'firebase_options.dart';
 import 'data/mock_data.dart';
@@ -11,6 +12,13 @@ import 'app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('Error loading .env file: $e');
+  }
 
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
