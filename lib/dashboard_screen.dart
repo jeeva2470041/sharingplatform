@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'post_item_screen.dart';
 import 'marketplace_screen.dart';
 import 'chat_screen.dart';
+import 'grok_chat_screen.dart';
 import 'qr_handover_screen.dart';
 import 'return_qr_screen.dart';
 import 'profile_screen.dart';
@@ -154,6 +155,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => const GrokChatScreen(),
+          );
+        },
+        backgroundColor: AppTheme.primary,
+        child: const Icon(Icons.smart_toy, color: Colors.white),
+      ),
       body: Column(
         children: [
           // Full-width gradient header
