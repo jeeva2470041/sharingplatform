@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'services/grok_service.dart';
 import 'app_theme.dart';
+import 'constants/assistant_prompts.dart';
+
 
 class GrokChatScreen extends StatefulWidget {
   const GrokChatScreen({super.key});
@@ -14,11 +16,11 @@ class _GrokChatScreenState extends State<GrokChatScreen> {
   final List<Map<String, String>> _messages = [
     {
       'role': 'system',
-      'content': 'You are a helpful and friendly assistant for a campus sharing platform. Use emojis in your responses to be more engaging. You help users with questions about borrowing, lending, and using the app.'
+      'content': AssistantPrompts.campusShareAssistant,
     },
     {
       'role': 'assistant',
-      'content': 'Hi there! 👋 I\'m your Campus Assistant. How can I help you today? 🚀'
+      'content': AssistantPrompts.initialGreeting,
     },
   ];
   final GrokService _grokService = GrokService();

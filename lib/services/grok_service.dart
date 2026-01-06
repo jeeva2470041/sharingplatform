@@ -5,22 +5,35 @@ import 'package:http/http.dart' as http;
 
 class GrokService {
   static final String _apiKey = dotenv.env['GROK_API_KEY'] ?? '';
-  static const String _baseUrl = 'https://api.groq.com/openai/v1/chat/completions';
+  
+  // Use proxy server for web, direct API for mobile/desktop
+  static String get _baseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:3000/api/groq/chat';
+    }
+    return 'https://api.groq.com/openai/v1/chat/completions';
+  }
 
   Future<String> getChatResponse(List<Map<String, String>> messages) async {
-    if (_apiKey.isEmpty) {
+    if (!kIsWeb && _apiKey.isEmpty) {
       debugPrint('❌ Grok API Key is empty');
       return 'Error: GROK_API_KEY is not set. Please check your .env file.';
     }
 
-    debugPrint('🚀 Sending request to Grok API...');
+    debugPrint('🚀 Sending request to Grok API... (Web: $kIsWeb)');
     try {
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      
+      // Only add Authorization header for non-web platforms
+      if (!kIsWeb) {
+        headers['Authorization'] = 'Bearer $_apiKey';
+      }
+
       final response = await http.post(
         Uri.parse(_baseUrl),
-        headers: {
-          'Authorization': 'Bearer $_apiKey',
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: jsonEncode({
           'model': 'llama-3.3-70b-versatile',
           'messages': messages,
